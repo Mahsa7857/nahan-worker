@@ -1,12 +1,11 @@
 import { connect } from "cloudflare:sockets";
 
 /* 
- * Project Nahan (نهان) - IoT Device Telemetry Gateway
+ * Project Nahan (賳賴丕賳) - IoT Device Telemetry Gateway
  * Handles real-time binary streams from remote sensor nodes.
- * Version 2.3.2 - Enhanced with Volume/Bandwidth Limiting
  */
 
-const CURRENT_VERSION = "2.3.2";
+const CURRENT_VERSION = "2.3.4";
 
 const getAlpha = () => String.fromCharCode(118, 108, 101, 115, 115);
 const getBeta = () => String.fromCharCode(116, 114, 111, 106, 97, 110);
@@ -37,6 +36,9 @@ const SYSTEM_DEFAULTS = {
     isPaused: false,
     silentAlerts: false,
     githubRepo: "itsyebekhe/nahan",
+    nameStrategy: "default",
+    namePrefix: "Core",
+    tgBotLang: "fa",
     users: [],
 };
 
@@ -68,7 +70,7 @@ async function d1Put(env, key, value) {
 
 function sha224Hex(m) {
     const msg = new TextEncoder().encode(m);
-    const K = [0x428A2F98,0x71374491,0xB5C0FBCF,0xE9B5DBA5,0x3956C25B,0x59F111F1,0x923F82A4,0xAB1C5ED5,0xD807AA98,0x12835B01,0x243185BE,0x550C7DC3,0x72BE5D74,0x80DEB1FE,0x9BDC06A7,0xC19BF174,0xE49B69C1,0xEFBE4786,0x0FC19DC6,0x240CA1CC,0x2DE92C6F,0x4A7484AA,0x5CB9A09,0x76F988DA,0x983E5152,0xA831C66D,0xB00327C8,0xBF597FC7,0xC6E00BF3,0xD5A79147,0x06CA6351,0x14292967,0x27B70A85,0x2E1B2138,0x4D2C6DFC,0x53380D13,0x650A7354,0x766A0ABB,0x81C2C92E,0x92722C85,0xA2BFE8A1,0xA81A664B,0xC24B8B70,0xC76C51A3,0xD192E819,0xD6990624,0xF40E3585,0x106AA070,0x19A4C116,0x1E376C08,0x2748774C,0x34B0BCB5,0x391C0CB3,0x4ED8AA4A,0x5B9CCA4F,0x682E6FF3,0x748F82EE,0x78A5636F,0x84C87814,0x8CC70208,0x90BEFFFA,0xA4506CEB,0xBEF9A3F7,0xC67178F2];
+    const K = [0x428A2F98,0x71374491,0xB5C0FBCF,0xE9B5DBA5,0x3956C25B,0x59F111F1,0x923F82A4,0xAB1C5ED5,0xD807AA98,0x12835B01,0x243185BE,0x550C7DC3,0x72BE5D74,0x80DEB1FE,0x9BDC06A7,0xC19BF174,0xE49B69C1,0xEFBE4786,0x0FC19DC6,0x240CA1CC,0x2DE92C6F,0x4A7484AA,0x5CB0A9DC,0x76F988DA,0x983E5152,0xA831C66D,0xB00327C8,0xBF597FC7,0xC6E00BF3,0xD5A79147,0x06CA6351,0x14292967,0x27B70A85,0x2E1B2138,0x4D2C6DFC,0x53380D13,0x650A7354,0x766A0ABB,0x81C2C92E,0x92722C85,0xA2BFE8A1,0xA81A664B,0xC24B8B70,0xC76C51A3,0xD192E819,0xD6990624,0xF40E3585,0x106AA070,0x19A4C116,0x1E376C08,0x2748774C,0x34B0BCB5,0x391C0CB3,0x4ED8AA4A,0x5B9CCA4F,0x682E6FF3,0x748F82EE,0x78A5636F,0x84C87814,0x8CC70208,0x90BEFFFA,0xA4506CEB,0xBEF9A3F7,0xC67178F2];
     let H = [0xC1059ED8,0x367CD507,0x3070DD17,0xF70E5939,0xFFC00B31,0x68581511,0x64F98FA7,0xBEFA4FA4];
     const words = []; const n = Math.ceil((msg.length + 9) / 64) * 16;
     for (let i = 0; i < n; i++) words[i] = 0;
@@ -105,16 +107,10 @@ function getTrojanHash(uuid) {
     return hash;
 }
 
-// Enhanced trackUsage function with volume/bandwidth tracking
 function trackUsage(uuid, bytes, env, ctx) {
     if (!sysUsageCache) sysUsageCache = { users: {} };
     if (!sysUsageCache.users) sysUsageCache.users = {};
-    if (!sysUsageCache.users[uuid]) sysUsageCache.users[uuid] = { 
-        reqs: 0, 
-        dReqs: 0, 
-        totalBytes: 0,
-        lastDay: new Date().toISOString().split('T')[0] 
-    };
+    if (!sysUsageCache.users[uuid]) sysUsageCache.users[uuid] = { reqs: 0, dReqs: 0, lastDay: new Date().toISOString().split('T')[0] };
     
     let u = sysUsageCache.users[uuid];
     let today = new Date().toISOString().split('T')[0];
@@ -124,13 +120,10 @@ function trackUsage(uuid, bytes, env, ctx) {
     }
     if (u.reqs === undefined) u.reqs = 0;
     if (u.dReqs === undefined) u.dReqs = 0;
-    if (u.totalBytes === undefined) u.totalBytes = 0;
 
     if (bytes === 0) {
         u.reqs += 1;
         u.dReqs += 1;
-    } else {
-        u.totalBytes += bytes;
     }
     
     const now = Date.now();
@@ -143,19 +136,9 @@ function trackUsage(uuid, bytes, env, ctx) {
                 sysConfig.users = sysConfig.users.filter(u => {
                     let uId = u.id.replace(/-/g, '').toLowerCase();
                     let sysU = sysUsageCache.users[uId];
-                    
-                    // Check total requests limit
-                    if (u.limitTotalReq && sysU?.reqs >= u.limitTotalReq) return false;
-                    
-                    // Check daily requests limit
-                    if (u.limitDailyReq && sysU?.lastDay === today && sysU?.dReqs >= u.limitDailyReq) return false;
-                    
-                    // Check volume/bandwidth limit (NEW)
-                    if (u.limitBytes && sysU?.totalBytes >= u.limitBytes) return false;
-                    
-                    // Check expiry
-                    if (u.expiryMs && now > u.expiryMs) return false;
-                    
+                    if (sysU) {
+                        if (u.limitTotalReq && sysU.reqs >= u.limitTotalReq) return false;
+                    }
                     return true;
                 });
                 if (sysConfig.users.length !== initialLen) {
@@ -218,7 +201,7 @@ export default {
                 }
                 if (reqPath === routes.tg) {
                     if (request.method !== "POST") return new Response("405", { status: 405 });
-                    return await handleTelegramWebhook(request, env, url.hostname);
+                    return await handleTelegramWebhook(request, env, url.hostname, ctx);
                 }
                 if (reqPath === routes.data) {
                     const ua = (request.headers.get("User-Agent") || "").toLowerCase();
@@ -266,7 +249,7 @@ async function serveMaintenancePage(request, url) {
         cleanHeaders.set("Host", targetUrl.hostname);
         cleanHeaders.delete("cf-connecting-ip");
         cleanHeaders.delete("x-forwarded-for");
-        const fetchInit = { method: request.method, headers: cleanHeaders, redirect: "manual" };
+        const fetchInit = { method: request.method, headers: cleanHeaders, redirect: "follow" };
         if (request.method !== "GET" && request.method !== "HEAD") fetchInit.body = request.body;
         return await fetch(new Request(targetUrl.toString(), fetchInit));
     } catch (e) { return new Response("Not Found", { status: 404 }); }
@@ -316,7 +299,7 @@ async function fetchCloudflareUsage(accountId, apiToken) {
 async function sendTelegramMessage(request, type) {
     if (!sysConfig.tgToken || !sysConfig.tgChatId) return;
 
-    let usageStr = "نامشخص (0.00%)";
+    let usageStr = "賳丕賲卮禺氐 (0.00%)";
     if (sysConfig.cfAccountId && sysConfig.cfApiToken) {
         const reqs = await fetchCloudflareUsage(sysConfig.cfAccountId, sysConfig.cfApiToken);
         if (reqs !== null) {
@@ -334,7 +317,7 @@ async function sendTelegramMessage(request, type) {
     const asOrg = cf.asOrganization || "Unknown";
     const domain = request.headers.get("Host") || new URL(request.url).hostname;
     const path = new URL(request.url).pathname;
-    const ua = request.headers.get("User-Agent") || "حالا یوزرایجنت مارو نبینین";
+    const ua = request.headers.get("User-Agent") || "丨丕賱丕 蹖賵夭乇丕蹖噩賳鬲 賲丕乇賵 賳亘蹖賳蹖賳";
 
     const d = new Date();
     const timeStr = new Intl.DateTimeFormat('fa-IR', { 
@@ -342,15 +325,15 @@ async function sendTelegramMessage(request, type) {
         hour: '2-digit', minute: '2-digit', second: '2-digit' 
     }).format(d);
 
-    const text = `📌 نوع: ${type}\n` +
-                 `🌐 IP: ${ip}\n` +
-                 `📍 موقعیت: ${country} ${city}\n` +
-                 `🏢 ASN: AS${asn} ${asOrg}\n` +
-                 `🔗 دامنه: ${domain}\n` +
-                 `🔍 مسیر: ${path}\n` +
-                 `🤖 مرورگر: ${ua}\n` +
-                 `📅 زمان: ${timeStr}\n` +
-                 `📊 مصرف: ${usageStr}`;
+    const text = `馃搶 賳賵毓: ${type}\n` +
+                 `馃寪 IP: ${ip}\n` +
+                 `馃搷 賲賵賯毓蹖鬲: ${country} ${city}\n` +
+                 `馃彚 ASN: AS${asn} ${asOrg}\n` +
+                 `馃敆 丿丕賲賳賴: ${domain}\n` +
+                 `馃攳 賲爻蹖乇: ${path}\n` +
+                 `馃 賲乇賵乇诏乇: ${ua}\n` +
+                 `馃搮 夭賲丕賳: ${timeStr}\n` +
+                 `馃搳 賲氐乇賮: ${usageStr}`;
 
     const panelUrl = `https://${domain}/${encodeURI(sysConfig.apiRoute)}/dash`;
 
@@ -365,10 +348,10 @@ async function sendTelegramMessage(request, type) {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: "ورود به پنل 🔐", web_app: { url: panelUrl } }],
+                        [{ text: "賵乇賵丿 亘賴 倬賳賱 馃攼", web_app: { url: panelUrl } }],
                         [
-                            { text: "دریافت ساب 🔗", callback_data: "get_sub" },
-                            { text: "بروزرسانی مصرف 📊", callback_data: "get_usage" }
+                            { text: "丿乇蹖丕賮鬲 爻丕亘 馃敆", callback_data: "get_sub" },
+                            { text: "亘乇賵夭乇爻丕賳蹖 賲氐乇賮 馃搳", callback_data: "get_usage" }
                         ]
                     ]
                 }
@@ -412,7 +395,7 @@ async function handleAuth(request, hostName, ctx, env) {
         const ip = request.headers.get("cf-connecting-ip") || "Unknown";
         if (data.key === sysConfig.masterKey) {
             ctx?.waitUntil(logActivity(env, "Auth Success", `Successful panel login from ${ip}`));
-            if (!sysConfig.silentAlerts && ctx) ctx.waitUntil(sendTelegramMessage(request, "ورود به پنل (موفق)"));
+            if (!sysConfig.silentAlerts && ctx) ctx.waitUntil(sendTelegramMessage(request, "賵乇賵丿 亘賴 倬賳賱 (賲賵賮賯)"));
             const netInfo = {
                 ip: ip,
                 colo: request.cf?.colo || "Unknown",
@@ -431,7 +414,7 @@ async function handleAuth(request, hostName, ctx, env) {
             }), { status: 200 });
         }
         ctx?.waitUntil(logActivity(env, "Auth Failed", `Failed login attempt from ${ip}`));
-        if (ctx) ctx.waitUntil(sendTelegramMessage(request, "تلاش ناموفق ورود به پنل!"));
+        if (ctx) ctx.waitUntil(sendTelegramMessage(request, "鬲賱丕卮 賳丕賲賵賮賯 賵乇賵丿 亘賴 倬賳賱!"));
         return new Response(JSON.stringify({ success: false }), { status: 401 });
     } catch (e) { return new Response(JSON.stringify({ success: false }), { status: 400 }); }
 }
@@ -477,208 +460,556 @@ async function handleConfigSync(request, env, ctx) {
     } catch (e) { return new Response(JSON.stringify({ success: false }), { status: 400 }); }
 }
 
-async function handleTelegramWebhook(request, env, hostName) {
+const botI18n = {
+    en: {
+        welcome: "馃 **Welcome to Nahan Gateway Bot**\nSelect your option below to manage your system:",
+        status: "馃搳 System Status",
+        users: "馃懃 Subscribers",
+        metrics: "馃摗 Gateway Health",
+        panic: "馃毃 Panic Mode",
+        dash: "馃攽 Dashboard Control",
+        lang: "馃寪 Change Language",
+        active: "馃煝 Active",
+        paused: "馃敶 Paused",
+        uptime: "鈴� Uptime",
+        streams: "馃摗 Active Streams",
+        no_users: "No subscribers found.",
+        sub_info: "馃懁 Subscriber Details:",
+        name: "Name",
+        total: "Total Reqs",
+        daily: "Daily Reqs",
+        expiry: "Expiry",
+        days: "Days remaining",
+        created: "Created At",
+        unlimited: "Unlimited",
+        btn_back: "鈼€锔� Back",
+        btn_next: "鈻讹笍 Next",
+        btn_del: "馃棏锔� Delete",
+        btn_pause: "鈴革笍 Pause",
+        btn_resume: "鈻讹笍 Resume",
+        btn_edit_name: "鉁忥笍 Change Name",
+        btn_edit_limits: "鈿欙笍 Limits",
+        btn_add: "+ Add Subscriber",
+        btn_confirm: "鉁� Confirm",
+        btn_cancel: "鉂� Cancel",
+        msg_enter_name: "Please send a name for the subscriber:",
+        msg_added: "Sub added successfully! 馃帀",
+        msg_deleted: "Sub deleted successfully! 馃棏锔�",
+        msg_panic: "馃毃 PANIC MODE ACTIVATED 馃毃\nRoute randomized & System Paused.",
+        msg_invalid: "Invalid input. Please try again.",
+        msg_enter_limits: "Enter limits format:\n`[totalReqs] [dailyReqs] [days_limit]`\n(Use 0 for unlimited)\n\nExample:\n`10000 500 30`",
+        msg_confirm_del: "鈿狅笍 Are you sure you want to delete this subscriber?",
+        msg_confirm_panic: "鈿狅笍 Are you absolutely sure you want to trigger PANIC mode? This will randomize API routes and pause all connections!",
+        status_updated: "Status updated! 馃攣"
+    },
+    fa: {
+        welcome: "馃 **亘賴 乇亘丕鬲 鬲乇丕賳夭蹖鬲 賳賴丕賳 禺賵卮 丌賲丿蹖丿**\n噩賴鬲 賲丿蹖乇蹖鬲 爻蹖爻鬲賲 賳馗丕乇鬲蹖 禺賵丿 蹖讴蹖 丕夭 诏夭蹖賳賴鈥屬囏й� 夭蹖乇 乇丕 丕賳鬲禺丕亘 賳賲丕蹖蹖丿:",
+        status: "馃搳 賵囟毓蹖鬲 爻蹖爻鬲賲",
+        users: "馃懃 賲丿蹖乇蹖鬲 賲卮鬲乇讴蹖賳",
+        metrics: "馃摗 爻賱丕賲鬲 丿乇诏丕賴 卮亘讴賴",
+        panic: "馃毃 賵囟毓蹖鬲 丕囟胤乇丕乇蹖 (Panic)",
+        dash: "馃攽 倬賳賱 鬲丨鬲 賵亘",
+        lang: "馃寪 鬲睾蹖蹖乇 夭亘丕賳 亘賴 丕賳诏賱蹖爻蹖",
+        active: "馃煝 賮毓丕賱",
+        paused: "馃敶 賲鬲賵賯賮 卮丿賴",
+        uptime: "鈴� 賲丿鬲 夭賲丕賳 讴丕乇讴乇丿",
+        streams: "馃摗 丕鬲氐丕賱丕鬲 賮毓丕賱",
+        no_users: "賴蹖趩 賲卮鬲乇讴蹖 倬蹖丿丕 賳卮丿.",
+        sub_info: "馃懁 賲卮禺氐丕鬲 賲卮鬲乇讴:",
+        name: "賳丕賲",
+        total: "丿乇禺賵丕爻鬲 讴賱",
+        daily: "丿乇禺賵丕爻鬲 乇賵夭丕賳賴",
+        expiry: "丕賳賯囟丕亍",
+        days: "乇賵夭賴丕蹖 亘丕賯蹖鈥屬呚з嗀�",
+        created: "鬲丕乇蹖禺 丕蹖噩丕丿",
+        unlimited: "賳丕賲丨丿賵丿",
+        btn_back: "鈼€锔� 亘丕夭诏卮鬲",
+        btn_next: "鈻讹笍 亘毓丿蹖",
+        btn_del: "馃棏锔� 丨匕賮",
+        btn_pause: "鈴革笍 睾蹖乇賮毓丕賱鈥屫池ж槽�",
+        btn_resume: "鈻讹笍 賮毓丕賱鈥屫池ж槽�",
+        btn_edit_name: "鉁忥笍 鬲睾蹖蹖乇 賳丕賲",
+        btn_edit_limits: "鈿欙笍 賵蹖乇丕蹖卮 賲丨丿賵丿蹖鬲鈥屬囏�",
+        btn_add: "+ 丕賮夭賵丿賳 賲卮鬲乇讴 噩丿蹖丿",
+        btn_confirm: "鉁� 鬲兀蹖蹖丿",
+        btn_cancel: "鉂� 丕賳氐乇丕賮",
+        msg_enter_name: "賱胤賮丕賸 賳丕賲 蹖丕 卮賳丕爻賴 賲卮鬲乇讴 噩丿蹖丿 乇丕 丕乇爻丕賱 賳賲丕蹖蹖丿:",
+        msg_added: "賲卮鬲乇讴 亘丕 賲賵賮賯蹖鬲 丕賮夭賵丿賴 卮丿! 馃帀",
+        msg_deleted: "賲卮鬲乇讴 亘丕 賲賵賮賯蹖鬲 丨匕賮 诏乇丿蹖丿! 馃棏锔�",
+        msg_panic: "馃毃 賵囟毓蹖鬲 丕囟胤乇丕乇蹖 賮毓丕賱 卮丿 馃毃\n賲爻蹖乇 鬲氐丕丿賮蹖 卮丿 賵 爻蹖爻鬲賲 賲鬲賵賯賮 诏乇丿蹖丿.",
+        msg_invalid: "賵乇賵丿蹖 賳丕賲毓鬲亘乇 丕爻鬲. 賲噩丿丿丕賸 鬲賱丕卮 賳賲丕蹖蹖丿.",
+        msg_enter_limits: "賮乇賲鬲 賵乇賵丿蹖 賲丨丿賵丿蹖鬲:\n`[讴賱] [乇賵夭丕賳賴] [賲丿鬲_乇賵夭]`\n(丕夭 0 亘乇丕蹖 賳丕賲丨丿賵丿 丕爻鬲賮丕丿賴 讴賳蹖丿)\n\n賲孬丕賱:\n`10000 500 30`",
+        msg_confirm_del: "鈿狅笍 丌蹖丕 丕夭 丨匕賮 丕蹖賳 賲卮鬲乇讴 丕胤賲蹖賳丕賳 讴丕賲賱 丿丕乇蹖丿責",
+        msg_confirm_panic: "鈿狅笍 丌蹖丕 丕夭 賮毓丕賱鈥屫池ж槽� 賵囟毓蹖鬲 丕囟胤乇丕乇蹖 丕胤賲蹖賳丕賳 丿丕乇蹖丿責 讴賱 丕鬲氐丕賱丕鬲 賲鬲賵賯賮 賵 丌丿乇爻鈥屬囏� 賲賳賯囟蹖 禺賵丕賴賳丿 卮丿!",
+        status_updated: "賵囟毓蹖鬲 亘乇賵夭乇爻丕賳蹖 卮丿! 馃攣"
+    }
+};
+
+async function handleTelegramWebhook(request, env, hostName, ctx) {
     try {
         const update = await request.json();
         const tgApi = `https://api.telegram.org/bot${sysConfig.tgToken}`;
         
+        let tgState = {};
+        try {
+            const storedState = await d1Get(env, "tg_bot_state");
+            if (storedState) tgState = JSON.parse(storedState);
+        } catch (e) { }
+
+        // Determine language code (default to Persian)
+        const langCode = sysConfig.tgBotLang || "fa";
+        const t = (key) => botI18n[langCode]?.[key] || botI18n["en"]?.[key] || key;
+
+        // Custom sendOrEdit message helper
+        const sendOrEdit = async (chatId, text, replyMarkup = null, messageId = null) => {
+            let res;
+            if (messageId) {
+                res = await fetch(`${tgApi}/editMessageText`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        message_id: messageId,
+                        text: text,
+                        parse_mode: 'HTML',
+                        reply_markup: replyMarkup
+                    })
+                });
+                if (res.ok) return res;
+            }
+            res = await fetch(`${tgApi}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: text,
+                    parse_mode: 'HTML',
+                    reply_markup: replyMarkup
+                })
+            });
+            return res;
+        };
+
+        const getMainMenu = () => {
+            const isPaused = sysConfig.isPaused || false;
+            const statusEmoji = isPaused ? "馃敶" : "馃煝";
+            const text = `${t("welcome")}\n\n` +
+                         `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n` +
+                         `鈿� **${t("status")}**: ${isPaused ? t("paused") : t("active")} ${statusEmoji}\n` +
+                         `馃懃 **${t("users")}**: ${sysConfig.users?.length || 0}\n` +
+                         `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣`;
+            const panelUrl = `https://${hostName}/${encodeURI(sysConfig.apiRoute)}/dash`;
+            const kb = {
+                inline_keyboard: [
+                    [
+                        { text: `馃寪 ${langCode === 'fa' ? 'English 馃嚭馃嚫' : '賮丕乇爻蹖 馃嚠馃嚪'}`, callback_data: "sys_lang" },
+                        { text: isPaused ? "鈻讹笍 Resume" : "鈴革笍 Pause", callback_data: "sys_toggle_status" }
+                    ],
+                    [
+                        { text: `馃懃 ${t("users")}`, callback_data: "subs_list:0" },
+                        { text: `馃摗 ${t("metrics")}`, callback_data: "sys_metrics" }
+                    ],
+                    [
+                        { text: `馃攽 ${t("dash")}`, web_app: { url: panelUrl } }
+                    ],
+                    [
+                        { text: `馃毃 ${t("panic")}`, callback_data: "sys_panic_init" }
+                    ]
+                ]
+            };
+            return { text, kb };
+        };
+
+        const getSubsList = (page = 0) => {
+            const users = sysConfig.users || [];
+            const itemsPerPage = 5;
+            const totalPages = Math.ceil(users.length / itemsPerPage);
+            const start = page * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageUsers = users.slice(start, end);
+            
+            let text = `馃懃 **${t("users")}** (Page ${page + 1}/${Math.max(1, totalPages)})\n`;
+            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
+            
+            if (users.length === 0) {
+                text += `鈿狅笍 ${t("no_users")}\n`;
+            } else {
+                pageUsers.forEach((u, idx) => {
+                    text += `${start + idx + 1}. 馃懁 **${u.name}**\n   <code>${u.id}</code>\n`;
+                });
+            }
+            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣`;
+            
+            const inline_keyboard = [];
+            pageUsers.forEach((u) => {
+                inline_keyboard.push([{ text: `馃懁 ${u.name}`, callback_data: `sub_detail:${u.id}` }]);
+            });
+            
+            const navRow = [];
+            if (page > 0) {
+                navRow.push({ text: `猬咃笍 ${t("btn_back")}`, callback_data: `subs_list:${page - 1}` });
+            }
+            if (end < users.length) {
+                navRow.push({ text: `${t("btn_next")} 鉃★笍`, callback_data: `subs_list:${page + 1}` });
+            }
+            if (navRow.length > 0) {
+                inline_keyboard.push(navRow);
+            }
+            
+            inline_keyboard.push([{ text: `鉃� ${t("btn_add")}`, callback_data: "sub_add_init" }]);
+            inline_keyboard.push([{ text: "馃敊 Main Menu", callback_data: "main_menu" }]);
+            
+            return { text, kb: { inline_keyboard } };
+        };
+
+        const getSubDetail = (uuid) => {
+            const users = sysConfig.users || [];
+            const u = users.find(usr => usr.id === uuid);
+            if (!u) {
+                return { text: "鈿狅笍 User not found", kb: { inline_keyboard: [[{ text: "Back", callback_data: "subs_list:0" }]] } };
+            }
+            
+            const sysU = sysUsageCache?.users?.[u.id.replace(/-/g,'').toLowerCase()] || { reqs: 0, dReqs: 0, lastDay: '' };
+            const userReqs = sysU.reqs || 0;
+            const curDate = new Date().toISOString().split('T')[0];
+            const userDReqs = sysU.lastDay === curDate ? (sysU.dReqs || 0) : 0;
+            
+            const limitTotalTxt = u.limitTotalReq ? `${u.limitTotalReq}` : t("unlimited");
+            const limitDailyTxt = u.limitDailyReq ? `${u.limitDailyReq}` : t("unlimited");
+            
+            let expTxt = t("unlimited");
+            let isExp = false;
+            if (u.expiryMs) {
+                const date = new Date(u.expiryMs);
+                expTxt = date.toLocaleDateString();
+                if (Date.now() > u.expiryMs) {
+                    expTxt += ` (${langCode === 'fa' ? '賲賳賯囟蹖 卮丿賴 馃敶' : 'Expired 馃敶'})`;
+                    isExp = true;
+                }
+            }
+            
+            const statusEmoji = u.isPaused ? "鈴革笍" : (isExp ? "馃敶" : "馃煝");
+            const statusText = u.isPaused ? t("paused") : (isExp ? (langCode==='fa'?'賲賳賯囟蹖':'Expired') : t("active"));
+            const subSync = `https://${hostName}/${sysConfig.apiRoute}?sub=${encodeURIComponent(u.name)}`;
+            
+            let text = `馃懁 **${t("sub_info")}**\n`;
+            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
+            text += `馃摏 **${t("name")}**: ${u.name}\n`;
+            text += `馃啍 **UUID**: <code>${u.id}</code>\n`;
+            text += `馃殾 **Status**: ${statusEmoji} ${statusText}\n`;
+            text += `馃搳 **${t("total")}**: ${userReqs} / ${limitTotalTxt}\n`;
+            text += `鈴� **${t("daily")}**: ${userDReqs} / ${limitDailyTxt}\n`;
+            text += `馃搮 **${t("expiry")}**: ${expTxt}\n`;
+            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
+            text += `馃敆 **Subscription Connection:**\n<code>${subSync}</code>`;
+            
+            const kb = {
+                inline_keyboard: [
+                    [
+                        { text: u.isPaused ? `鈻讹笍 ${t("btn_resume")}` : `鈴革笍 ${t("btn_pause")}`, callback_data: `sub_toggle:${u.id}` },
+                        { text: `馃棏锔� ${t("btn_del")}`, callback_data: `sub_del_init:${u.id}` }
+                    ],
+                    [
+                        { text: `鉁忥笍 ${t("btn_edit_name")}`, callback_data: `sub_edit_name_init:${u.id}` },
+                        { text: `鈿欙笍 ${t("btn_edit_limits")}`, callback_data: `sub_edit_limits_init:${u.id}` }
+                    ],
+                    [
+                        { text: "馃敊 Back to List", callback_data: "subs_list:0" }
+                    ]
+                ]
+            };
+            return { text, kb };
+        };
+
         if (update.callback_query) {
             const cb = update.callback_query;
             const chatId = cb.message?.chat?.id;
+            const messageId = cb.message?.message_id;
             const data = cb.data;
 
             if (chatId) {
-                if (data === "get_usage") {
-                    let usageStr = "نامشخص (0.00%)";
+                // Clear state on callback query to keep bot highly responsive and intuitive
+                tgState[chatId] = null;
+                ctx?.waitUntil(d1Put(env, "tg_bot_state", JSON.stringify(tgState)));
+
+                if (data === "main_menu") {
+                    const menu = getMainMenu();
+                    await sendOrEdit(chatId, menu.text, menu.kb, messageId);
+                } else if (data === "sys_lang") {
+                    sysConfig.tgBotLang = (langCode === "fa") ? "en" : "fa";
+                    await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                    const menu = getMainMenu();
+                    await sendOrEdit(chatId, menu.text, menu.kb, messageId);
+                } else if (data === "sys_toggle_status") {
+                    sysConfig.isPaused = !sysConfig.isPaused;
+                    await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                    const menu = getMainMenu();
+                    await sendOrEdit(chatId, menu.text, menu.kb, messageId);
+                } else if (data === "sys_metrics") {
+                    let usageStr = t("unlimited");
                     if (sysConfig.cfAccountId && sysConfig.cfApiToken) {
                         const reqs = await fetchCloudflareUsage(sysConfig.cfAccountId, sysConfig.cfApiToken);
                         if (reqs !== null) {
                             const pct = ((reqs / 100000) * 100).toFixed(2);
                             usageStr = `${reqs}/100000 (${pct}%)`;
-                        } else {
-                            usageStr = "خطا در دریافت مصرف";
                         }
-                    } else {
-                        usageStr = "مقادیر CF تنظیم نشده است";
                     }
-
-                    await fetch(`${tgApi}/answerCallbackQuery`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callback_query_id: cb.id, text: `مصرف روزانه:\n${usageStr}`, show_alert: true })
-                    });
-                } else if (data === "get_sub") {
-                    const subSync = `https://${hostName}/${encodeURI(sysConfig.apiRoute)}`;
-                    await fetch(`${tgApi}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            chat_id: chatId, 
-                            text: `🔗 **لینک استریم شما:**\n\n<code>${subSync}</code>`, 
-                            parse_mode: 'HTML' 
-                        })
-                    });
-                    await fetch(`${tgApi}/answerCallbackQuery`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callback_query_id: cb.id, text: "لینک استریم ارسال شد." })
-                    });
-                } else if (data === "cb_pause") {
-                    sysConfig.isPaused = true;
-                    await d1Put(env, "sys_config", JSON.stringify({ ...sysConfig, isPaused: true }));
-                    await fetch(`${tgApi}/answerCallbackQuery`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: cb.id, text: "سیستم متوقف شد. 🔴" }) });
-                } else if (data === "cb_resume") {
-                    sysConfig.isPaused = false;
-                    await d1Put(env, "sys_config", JSON.stringify({ ...sysConfig, isPaused: false }));
-                    await fetch(`${tgApi}/answerCallbackQuery`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: cb.id, text: "سیستم مجدداً فعال شد. 🟢" }) });
-                }
-            }
-        } else if (update.message && update.message.text) {
-            const chatId = update.message.chat.id;
-            
-            if (chatId.toString() === sysConfig.tgChatId.toString()) {
-                const text = update.message.text;
-                if (text === "/status") {
-                    await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: `وضعیت سیستم: ${sysConfig.isPaused ? "🔴 متوقف شده" : "🟢 فعال"}` }) });
-                } else if (text === "/pause") {
-                    sysConfig.isPaused = true;
-                    await d1Put(env, "sys_config", JSON.stringify({ ...sysConfig, isPaused: true }));
-                    await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: "🔴 جریان داده‌ها متوقف شد." }) });
-                } else if (text === "/resume") {
-                    sysConfig.isPaused = false;
-                    await d1Put(env, "sys_config", JSON.stringify({ ...sysConfig, isPaused: false }));
-                    await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: "🟢 جریان داده‌ها مجدداً برقرار شد." }) });
-                } else if (text === "/ping") {
                     const upSeconds = Math.floor((Date.now() - isolateStartTime)/1000);
                     const dh = Math.floor(upSeconds/3600);
                     const dm = Math.floor((upSeconds%3600)/60);
-                    await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: `🟢 Gateway Health:\n\n⏱ Uptime: ${dh}h ${dm}m\n📡 Active Streams: ${activeConnections}` }) });
-                } else if (text === "/panic") {
+                    
+                    let text = `馃摗 **${t("metrics")}**\n`;
+                    text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
+                    text += `鈴� **${t("uptime")}**: ${dh}h ${dm}m\n`;
+                    text += `馃攲 **${t("streams")}**: ${activeConnections}\n`;
+                    text += `馃搳 **Cloudflare API Usage**: ${usageStr}\n`;
+                    text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣`;
+                    
+                    const kb = { inline_keyboard: [[{ text: `馃敊 Main Menu`, callback_data: "main_menu" }]] };
+                    await sendOrEdit(chatId, text, kb, messageId);
+                } else if (data.startsWith("subs_list:")) {
+                    const page = parseInt(data.replace("subs_list:", "")) || 0;
+                    const list = getSubsList(page);
+                    await sendOrEdit(chatId, list.text, list.kb, messageId);
+                } else if (data.startsWith("sub_detail:")) {
+                    const uuid = data.replace("sub_detail:", "");
+                    const detail = getSubDetail(uuid);
+                    await sendOrEdit(chatId, detail.text, detail.kb, messageId);
+                } else if (data.startsWith("sub_toggle:")) {
+                    const uuid = data.replace("sub_toggle:", "");
+                    if (sysConfig.users) {
+                        const u = sysConfig.users.find(usr => usr.id === uuid);
+                        if (u) {
+                            u.isPaused = !u.isPaused;
+                            await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                        }
+                    }
+                    const detail = getSubDetail(uuid);
+                    await sendOrEdit(chatId, detail.text, detail.kb, messageId);
+                } else if (data.startsWith("sub_del_init:")) {
+                    const uuid = data.replace("sub_del_init:", "");
+                    const u = sysConfig.users?.find(usr => usr.id === uuid);
+                    const name = u ? u.name : "";
+                    const text = `${t("msg_confirm_del")}\n\n馃懁 **${name}**`;
+                    const kb = {
+                        inline_keyboard: [
+                            [
+                                { text: `鉁� ${t("btn_confirm")}`, callback_data: `sub_del_confirm:${uuid}` },
+                                { text: `鉂� ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }
+                            ]
+                        ]
+                    };
+                    await sendOrEdit(chatId, text, kb, messageId);
+                } else if (data.startsWith("sub_del_confirm:")) {
+                    const uuid = data.replace("sub_del_confirm:", "");
+                    if (sysConfig.users) {
+                        sysConfig.users = sysConfig.users.filter(usr => usr.id !== uuid);
+                        await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                    }
+                    const successText = `鉁� ${t("msg_deleted")}`;
+                    const kb = { inline_keyboard: [[{ text: t("btn_back"), callback_data: "subs_list:0" }]] };
+                    await sendOrEdit(chatId, successText, kb, messageId);
+                } else if (data === "sub_add_init") {
+                    tgState[chatId] = { step: "sub_add_name" };
+                    await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                    const text = `鉃� ${t("msg_enter_name")}`;
+                    const kb = { inline_keyboard: [[{ text: `鉂� ${t("btn_cancel")}`, callback_data: "subs_list:0" }]] };
+                    await sendOrEdit(chatId, text, kb, messageId);
+                } else if (data.startsWith("sub_edit_name_init:")) {
+                    const uuid = data.replace("sub_edit_name_init:", "");
+                    tgState[chatId] = { step: `sub_edit_name:${uuid}` };
+                    await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                    const text = `鉁忥笍 ${t("msg_enter_name")}`;
+                    const kb = { inline_keyboard: [[{ text: `鉂� ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }]] };
+                    await sendOrEdit(chatId, text, kb, messageId);
+                } else if (data.startsWith("sub_edit_limits_init:")) {
+                    const uuid = data.replace("sub_edit_limits_init:", "");
+                    tgState[chatId] = { step: `sub_edit_limits:${uuid}` };
+                    await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                    const text = `鈿欙笍 ${t("msg_enter_limits")}`;
+                    const kb = {
+                        inline_keyboard: [
+                            [{ text: `鈾撅笍 Skip (Unlimited)`, callback_data: `sub_unlimit_cb:${uuid}` }],
+                            [{ text: `鉂� ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }]
+                        ]
+                    };
+                    await sendOrEdit(chatId, text, kb, messageId);
+                } else if (data.startsWith("sub_unlimit_cb:")) {
+                    const uuid = data.replace("sub_unlimit_cb:", "");
+                    if (sysConfig.users) {
+                        const u = sysConfig.users.find(usr => usr.id === uuid);
+                        if (u) {
+                            u.limitTotalReq = null;
+                            u.limitDailyReq = null;
+                            u.expiryMs = null;
+                            await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                        }
+                    }
+                    const detail = getSubDetail(uuid);
+                    await sendOrEdit(chatId, detail.text, detail.kb, messageId);
+                } else if (data === "sub_add_unlimited_skip") {
+                    let stateName = "Subscriber";
+                    try {
+                        const savedStateRaw = await d1Get(env, "tg_bot_state");
+                        if (savedStateRaw) {
+                            const stObj = JSON.parse(savedStateRaw);
+                            if (stObj[chatId] && stObj[chatId].name) {
+                                stateName = stObj[chatId].name;
+                            }
+                        }
+                    } catch(e){}
+                    
+                    const newUuid = crypto.randomUUID();
+                    if (!sysConfig.users) sysConfig.users = [];
+                    sysConfig.users.push({
+                        id: newUuid,
+                        name: stateName,
+                        limitTotalReq: null,
+                        limitDailyReq: null,
+                        expiryMs: null,
+                        createdAt: Date.now()
+                    });
+                    
+                    tgState[chatId] = null;
+                    await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                    await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                    
+                    const successText = `鉁� ${t("msg_added")}`;
+                    const detail = getSubDetail(newUuid);
+                    await sendOrEdit(chatId, `${successText}\n\n${detail.text}`, detail.kb, messageId);
+                } else if (data === "sys_panic_init") {
+                    const text = `${t("msg_confirm_panic")}`;
+                    const kb = {
+                        inline_keyboard: [
+                            [
+                                { text: `馃毃 YES PANIC 馃毃`, callback_data: "sys_panic_confirm" },
+                                { text: `鉂� No, Cancel`, callback_data: "main_menu" }
+                            ]
+                        ]
+                    };
+                    await sendOrEdit(chatId, text, kb, messageId);
+                } else if (data === "sys_panic_confirm") {
                     sysConfig.apiRoute = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
                     sysConfig.isPaused = true;
                     await d1Put(env, "sys_config", JSON.stringify(sysConfig));
-                    await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: `🚨 PANIC MODE ACTIVATED 🚨\n\nRoute randomized & System Paused.\nAccess Revoked.` }) });
-                } else if (text.startsWith("/users")) {
-                    let umsg = "👥 لیست کاربران:\n\n";
-                    if(!sysConfig.users || sysConfig.users.length === 0) umsg += "کاربری یافت نشد.";
-                    else {
-                        sysConfig.users.forEach(u => {
-                            let sysU = sysUsageCache?.users?.[u.id.replace(/-/g,'').toLowerCase()] || {};
-                            let reqs = sysU.reqs || 0;
-                            let dReqs = sysU.lastDay === new Date().toISOString().split('T')[0] ? (sysU.dReqs || 0) : 0;
-                            let bytes = sysU.totalBytes || 0;
-                            let bytesGB = (bytes / 1024 / 1024 / 1024).toFixed(2);
-                            let limitBytesGB = u.limitBytes ? (u.limitBytes / 1024 / 1024 / 1024).toFixed(1) : 'نامحدود';
-                            umsg += `👤 ${u.name}\nUUID: ${u.id}\nحجم مصرفی: ${bytesGB} GB / ${limitBytesGB} GB\nدرخواست کل: ${reqs} ${u.limitTotalReq ? '/ ' + u.limitTotalReq : ''}\nدرخواست روزانه: ${dReqs} ${u.limitDailyReq ? '/ ' + u.limitDailyReq : ''}\n\n`;
-                        });
-                    }
-                    await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: umsg }) });
-                } else if (text.startsWith("/adduser")) {
-                    const parts = text.split(" ");
-                    if(parts.length < 2) {
-                        await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: "طرز استفاده: /adduser [name] [total_reqs] [daily_reqs] [days]\n(برای مقادیر نامحدود از 0 استفاده کنید)" }) });
-                    } else {
-                        const name = parts[1];
-                        const tReq = parts[2] && parseInt(parts[2]) > 0 ? parseInt(parts[2]) : null;
-                        const dReq = parts[3] && parseInt(parts[3]) > 0 ? parseInt(parts[3]) : null;
-                        const days = parts[4] && parseInt(parts[4]) > 0 ? parseInt(parts[4]) : null;
-                        const newUuid = crypto.randomUUID();
-                        if(!sysConfig.users) sysConfig.users = [];
-                        sysConfig.users.push({
-                            id: newUuid, name: name, limitTotalReq: tReq, limitDailyReq: dReq, limitBytes: null,
-                            expiryMs: days ? Date.now() + days*86400000 : null,
-                            createdAt: Date.now()
-                        });
-                        await d1Put(env, "sys_config", JSON.stringify(sysConfig));
-                        await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: `✅ کاربر جدید اضافه شد.\n\nنام: ${name}\nUUID: ${newUuid}\nدرخواست کل: ${tReq ? tReq : 'نامحدود'}\nدرخواست روزانه: ${dReq ? dReq : 'نامحدود'}\nاعتبار: ${days ? days + ' روز' : 'نامحدود'}` }) });
-                    }
-                } else if (text.startsWith("/addvolume")) {
-                    const parts = text.split(" ");
-                    if(parts.length < 4) {
-                        await fetch(`${tgApi}/sendMessage`, { 
-                            method: 'POST', 
-                            headers: { 'Content-Type': 'application/json' }, 
-                            body: JSON.stringify({ 
-                                chat_id: chatId, 
-                                text: "طرز استفاده: /addvolume [name] [volume_gb] [days_limit]\nمثال: /addvolume Ali 50 30" 
-                            }) 
-                        });
-                    } else {
-                        const name = parts[1];
-                        const volumeGB = parseInt(parts[2]);
-                        const days = parseInt(parts[3]);
-                        
-                        if(isNaN(volumeGB) || volumeGB <= 0) {
-                            await fetch(`${tgApi}/sendMessage`, { 
-                                method: 'POST', 
-                                headers: { 'Content-Type': 'application/json' }, 
-                                body: JSON.stringify({ chat_id: chatId, text: "❌ حجم باید یک عدد معتبر باشد." }) 
-                            });
-                            return;
-                        }
-                        
-                        const limitBytes = volumeGB * 1024 * 1024 * 1024;
-                        const newUuid = crypto.randomUUID();
-                        
-                        if(!sysConfig.users) sysConfig.users = [];
-                        sysConfig.users.push({
-                            id: newUuid, 
-                            name: name, 
-                            limitBytes: limitBytes,
-                            limitTotalReq: null,
-                            limitDailyReq: null,
-                            expiryMs: days ? Date.now() + days*86400000 : null,
-                            createdAt: Date.now()
-                        });
-                        
-                        await d1Put(env, "sys_config", JSON.stringify(sysConfig));
-                        await fetch(`${tgApi}/sendMessage`, { 
-                            method: 'POST', 
-                            headers: { 'Content-Type': 'application/json' }, 
-                            body: JSON.stringify({ 
-                                chat_id: chatId, 
-                                text: `✅ کاربر جدید اضافه شد.\n\nنام: ${name}\nUUID: ${newUuid}\nمحدودیت حجم: ${volumeGB} GB\nاعتبار: ${days ? days + ' روز' : 'نامحدود'}` 
-                            }) 
-                        });
-                    }
-                } else if (text.startsWith("/deluser")) {
-                    const parts = text.split(" ");
-                    if(parts.length < 2) {
-                        await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: "طرز استفاده: /deluser [uuid]" }) });
-                    } else {
-                        const initLen = sysConfig.users ? sysConfig.users.length : 0;
-                        if(sysConfig.users) sysConfig.users = sysConfig.users.filter(u => u.id !== parts[1]);
-                        if(sysConfig.users.length < initLen) {
-                            await d1Put(env, "sys_config", JSON.stringify(sysConfig));
-                            await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: "✅ کاربر حذف شد." }) });
-                        } else {
-                            await fetch(`${tgApi}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: "❌ کاربری با این UUID یافت نشد." }) });
-                        }
-                    }
-                } else {
-                    const panelUrl = `https://${hostName}/${encodeURI(sysConfig.apiRoute)}/dash`;
-                    await fetch(`${tgApi}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: chatId,
-                            text: "🤖 **ربات سیستم نهان**\nانتخاب کنید:\n\nدستورات سریع:\n/pause - توقف اتصالات\n/resume - از سرگیری\n/status - وضعیت\n/ping - پراکسی وضعیت\n/users - لیست کاربران\n/adduser [name] [total_reqs] [daily_reqs] [days] - افزودن کاربر بر اساس درخواست\n/addvolume [name] [volume_gb] [days] - افزودن کاربر بر اساس حجم (مثال: /addvolume Ali 50 30)\n/deluser [uuid] - حذف کاربر\n/panic - قطع دسترسی 🚨",
-                            parse_mode: 'HTML',
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [{ text: "ورود به کنترل‌پنل 🔐", web_app: { url: panelUrl } }],
-                                    [
-                                        { text: "دریافت استریم 🔗", callback_data: "get_sub" },
-                                        { text: "بررسی محدودیت 📊", callback_data: "get_usage" }
-                                    ],
-                                    [
-                                        { text: sysConfig.isPaused ? "▶️ شروع سیستم" : "⏸ توقف سیستم", callback_data: sysConfig.isPaused ? "cb_resume" : "cb_pause" }
-                                    ]
-                                ]
-                            }
-                        })
-                    });
+                    const successText = `${t("msg_panic")}\n\n馃攽 New Secret Path Randomized. All old sessions revoked.`;
+                    const kb = { inline_keyboard: [[{ text: `馃敊 Main Menu`, callback_data: "main_menu" }]] };
+                    await sendOrEdit(chatId, successText, kb, messageId);
                 }
+                
+                await fetch(`${tgApi}/answerCallbackQuery`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ callback_query_id: cb.id, text: "Done!" })
+                });
+            }
+        } else if (update.message && update.message.text) {
+            const chatId = update.message.chat.id;
+            const text = update.message.text.trim();
+            
+            if (chatId.toString() === sysConfig.tgChatId.toString()) {
+                const state = tgState[chatId];
+                
+                if (state) {
+                    if (state.step === "sub_add_name") {
+                        const name = text;
+                        tgState[chatId] = { step: "sub_add_limits", name: name };
+                        await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                        
+                        const msg = `鈿欙笍 **${name}**\n\n${t("msg_enter_limits")}`;
+                        const kb = {
+                            inline_keyboard: [
+                                [{ text: `鈾撅笍 Skip (Unlimited)`, callback_data: "sub_add_unlimited_skip" }],
+                                [{ text: `鉂� ${t("btn_cancel")}`, callback_data: "main_menu" }]
+                            ]
+                        };
+                        await sendOrEdit(chatId, msg, kb);
+                        return new Response("OK", { status: 200 });
+                    }
+                    
+                    if (state.step === "sub_add_limits" || state.step === "sub_add_unlimited_skip") {
+                        const name = state.name;
+                        let tReq = null;
+                        let dReq = null;
+                        let days = null;
+                        
+                        if (state.step !== "sub_add_unlimited_skip" && text !== "0" && text !== "0 0 0") {
+                            const parts = text.split(/\s+/).map(Number);
+                            if (parts[0] > 0) tReq = parts[0];
+                            if (parts[1] > 0) dReq = parts[1];
+                            if (parts[2] > 0) days = parts[2];
+                        }
+                        
+                        const newUuid = crypto.randomUUID();
+                        if (!sysConfig.users) sysConfig.users = [];
+                        sysConfig.users.push({
+                            id: newUuid,
+                            name: name,
+                            limitTotalReq: tReq,
+                            limitDailyReq: dReq,
+                            expiryMs: days ? Date.now() + days * 86400000 : null,
+                            createdAt: Date.now()
+                        });
+                        
+                        tgState[chatId] = null;
+                        await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                        await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                        
+                        const successText = `鉁� ${t("msg_added")}`;
+                        const detail = getSubDetail(newUuid);
+                        await sendOrEdit(chatId, `${successText}\n\n${detail.text}`, detail.kb);
+                        return new Response("OK", { status: 200 });
+                    }
+                    
+                    if (state.step.startsWith("sub_edit_name:")) {
+                        const uuid = state.step.replace("sub_edit_name:", "");
+                        if (sysConfig.users) {
+                            const u = sysConfig.users.find(usr => usr.id === uuid);
+                            if (u) {
+                                u.name = text;
+                                await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                            }
+                        }
+                        tgState[chatId] = null;
+                        await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                        
+                        const detail = getSubDetail(uuid);
+                        await sendOrEdit(chatId, `鉁� Successfully Changed!`, detail.kb);
+                        return new Response("OK", { status: 200 });
+                    }
+                    
+                    if (state.step.startsWith("sub_edit_limits:")) {
+                        const uuid = state.step.replace("sub_edit_limits:", "");
+                        let tReq = null;
+                        let dReq = null;
+                        let days = null;
+                        
+                        const parts = text.split(/\s+/).map(Number);
+                        if (parts[0] > 0) tReq = parts[0];
+                        if (parts[1] > 0) dReq = parts[1];
+                        if (parts[2] > 0) days = parts[2];
+                        
+                        if (sysConfig.users) {
+                            const u = sysConfig.users.find(usr => usr.id === uuid);
+                            if (u) {
+                                u.limitTotalReq = tReq;
+                                u.limitDailyReq = dReq;
+                                u.expiryMs = days ? Date.now() + days * 86400000 : null;
+                                await d1Put(env, "sys_config", JSON.stringify(sysConfig));
+                            }
+                        }
+                        tgState[chatId] = null;
+                        await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
+                        
+                        const detail = getSubDetail(uuid);
+                        await sendOrEdit(chatId, `鉁� Limits Updated!`, detail.kb);
+                        return new Response("OK", { status: 200 });
+                    }
+                }
+                
+                // Default message / fallback menu
+                const menu = getMainMenu();
+                await sendOrEdit(chatId, menu.text, menu.kb);
             }
         }
         return new Response("OK", { status: 200 });
@@ -701,9 +1032,6 @@ async function startDataPipe(webSocket, env, ctx) {
     webSocket.addEventListener('error', () => activeConnections--);
     let remoteSocket, dataWriter, isInit = true, queue = Promise.resolve();
     let activeClientHash = null;
-    let totalBytesSent = 0;
-    let totalBytesReceived = 0;
-    
     webSocket.addEventListener("message", (event) => {
         queue = queue.then(async () => {
             try {
@@ -712,10 +1040,7 @@ async function startDataPipe(webSocket, env, ctx) {
                     const isModeAlpha = await parseSensorData(event.data);
                     if (isModeAlpha) webSocket.send(new Uint8Array([0, 0]));
                 } else if (dataWriter) {
-                    const data = event.data;
-                    totalBytesSent += data.byteLength;
-                    trackUsage(activeClientHash, data.byteLength, env, ctx);
-                    await dataWriter.write(data);
+                    await dataWriter.write(event.data);
                 }
             } catch (err) { webSocket.close(); }
         });
@@ -731,7 +1056,7 @@ async function startDataPipe(webSocket, env, ctx) {
             // Validate UUID
             let clientHash = Array.from(view.slice(1, 17)).map(b => b.toString(16).padStart(2, '0')).join('');
             let validUUIDs = getAllProfiles().map(p => p.id.replace(/-/g, '').toLowerCase());
-            if (!validUUIDs.includes(clientHash)) return false;
+            if (!validUUIDs.includes(clientHash)) return false; // DROP IF INVALID PROFILE
             
             activeClientHash = clientHash;
             trackUsage(activeClientHash, 0, env, ctx);
@@ -808,28 +1133,11 @@ async function startDataPipe(webSocket, env, ctx) {
         dataWriter = remoteSocket.writable.getWriter();
         if (offset < bufferData.byteLength) {
             let chunk = bufferData.slice(offset);
-            totalBytesSent += chunk.byteLength;
-            trackUsage(activeClientHash, chunk.byteLength, env, ctx);
             await dataWriter.write(chunk);
         }
-        
-        // Track incoming data from remote socket
-        const reader = remoteSocket.readable.getReader();
-        (async () => {
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    totalBytesReceived += value.byteLength;
-                    trackUsage(activeClientHash, 0, env, ctx); // Count as request
-                    webSocket.send(value);
-                }
-            } catch (err) {
-                // Connection closed
-            } finally {
-                reader.releaseLock();
-            }
-        })();
+        remoteSocket.readable.pipeTo(new WritableStream({ write(chunk) { 
+            webSocket.send(chunk); 
+        } }));
 
         return isModeAlpha;
     }
@@ -860,24 +1168,13 @@ function getAllProfiles(targetSub = null) {
             let skip = false;
             if (u.expiryMs && now > u.expiryMs) skip = true;
             if (u.isPaused) skip = true;
-            
-            // Check total requests limit
             if (u.limitTotalReq && sysUsageCache && sysUsageCache.users && sysUsageCache.users[u.id.replace(/-/g, '').toLowerCase()]) {
                 if (sysUsageCache.users[u.id.replace(/-/g, '').toLowerCase()].reqs >= u.limitTotalReq) skip = true;
             }
-            
-            // Check daily requests limit
             if (u.limitDailyReq && sysUsageCache && sysUsageCache.users && sysUsageCache.users[u.id.replace(/-/g, '').toLowerCase()]) {
                 let usr = sysUsageCache.users[u.id.replace(/-/g, '').toLowerCase()];
                 if (usr.lastDay === new Date().toISOString().split('T')[0] && usr.dReqs >= u.limitDailyReq) skip = true;
             }
-            
-            // Check volume/bandwidth limit (NEW)
-            if (u.limitBytes && sysUsageCache && sysUsageCache.users && sysUsageCache.users[u.id.replace(/-/g, '').toLowerCase()]) {
-                let usr = sysUsageCache.users[u.id.replace(/-/g, '').toLowerCase()];
-                if (usr.totalBytes >= u.limitBytes) skip = true;
-            }
-            
             if(!skip) {
                 list.push({ id: u.id, name: u.name });
             }
@@ -905,6 +1202,25 @@ function buildSingleUri(hostName) {
     return `${uriProto}://${activeDeviceId}@${finalIP}:${firstPort}?${ext}#${finalHost}`;
 }
 
+function getConfigName(type, profileName, port, hostName, ip) {
+    let prefix = sysConfig.namePrefix || "Core";
+    let strategy = sysConfig.nameStrategy || "default";
+    let cleanName = profileName === "Default" ? "" : `-${profileName}`;
+    let typeLab = type === "alpha" ? "V" : "T";
+    
+    if (strategy === "type-user-port") {
+        return `${type === "alpha" ? "vless" : "trojan"}-${profileName}-${port}`;
+    } else if (strategy === "user-port") {
+        return `${profileName}-${port}`;
+    } else if (strategy === "host-port-user") {
+        return `${hostName}-${port}${cleanName}`;
+    } else if (strategy === "prefix-user-port") {
+        return `${prefix}${cleanName}-${port}`;
+    } else { // "default"
+        return `${typeLab}-Core-${port}${cleanName}`;
+    }
+}
+
 function buildUriProfile(hostName, targetSub = null) {
     let allHostNames = [hostName];
     if (sysConfig.slaveNodes) allHostNames.push(...sysConfig.slaveNodes.split(/[\r\n,;]+/).map(s=>s.trim()).filter(Boolean));
@@ -923,9 +1239,8 @@ function buildUriProfile(hostName, targetSub = null) {
                 let extBase = `encryption=none&security=${sec}&sni=${hName}&fp=${sysConfig.agent}&type=ws&host=${hName}&path=${reqPath}`;
                 if (sysConfig.enableOpt2) extBase += `&pbk=enabled`;
                 ips.forEach(ip => {
-                    let nameExt = p.name === "Default" ? `${port}` : `${port}-${p.name}`;
-                    let vName = `V-Core-${nameExt}`;
-                    let tName = `T-Core-${nameExt}`;
+                    let vName = getConfigName("alpha", p.name, port, hName, ip);
+                    let tName = getConfigName("beta", p.name, port, hName, ip);
                     
                     if (sysConfig.mode === "alpha" || sysConfig.mode === "both") {
                         lines.push(`${getAlpha()}://${p.id}@${ip}:${port}?${extBase}#${vName}`);
@@ -955,16 +1270,14 @@ function buildYamlProfile(hostName, targetSub = null) {
             ports.forEach(port => {
                 let sec = getTransportParams(port) === "tls" ? "true" : "false";
                 ips.forEach(ip => {
-                    let nameExt = p.name === "Default" ? `${port}` : `${port}-${p.name}`;
-                    
                     if (sysConfig.mode === "alpha" || sysConfig.mode === "both") {
-                        let vName = `V-Core-${nameExt}`;
+                        let vName = getConfigName("alpha", p.name, port, hName, ip);
                         proxyNames.push(`"${vName}"`);
                         proxies.push(`- name: "${vName}"\n  type: ${getAlpha()}\n  server: ${ip}\n  port: ${port}\n  uuid: ${p.id}\n  udp: true\n  tls: ${sec}\n  sni: ${hName}\n  client-fingerprint: ${sysConfig.agent}\n  network: ws\n  ws-opts:\n    path: "/${sysConfig.apiRoute}"\n    headers: { Host: ${hName} }\n${sysConfig.enableOpt1 ? "  tfo: true" : ""}`);
                     }
 
                     if (sysConfig.mode === "beta" || sysConfig.mode === "both") {
-                        let tName = `T-Core-${nameExt}`;
+                        let tName = getConfigName("beta", p.name, port, hName, ip);
                         proxyNames.push(`"${tName}"`);
                         proxies.push(`- name: "${tName}"\n  type: ${getBeta()}\n  server: ${ip}\n  port: ${port}\n  password: ${p.id}\n  udp: true\n  tls: ${sec}\n  sni: ${hName}\n  client-fingerprint: ${sysConfig.agent}\n  network: ws\n  ws-opts:\n    path: "/${sysConfig.apiRoute}"\n    headers: { Host: ${hName} }\n${sysConfig.enableOpt1 ? "  tfo: true" : ""}`);
                     }
@@ -976,7 +1289,6 @@ function buildYamlProfile(hostName, targetSub = null) {
     return `proxies:\n${proxies.join('\n')}\nproxy-groups:\n- name: Data Group\n  type: select\n  proxies: \n${proxyNames.map(n => `    - ${n}`).join('\n')}\nrules:\n  - MATCH,Data Group\n`;
 }
 
-// Dashboard UI with enhanced user management including volume limit field
 function getDashboardUI(hasDB) {
     return `
   <!DOCTYPE html>
@@ -1043,7 +1355,7 @@ function getDashboardUI(hasDB) {
               ${!hasDB ? `<div class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm border border-red-100 dark:border-red-900/30"><span data-i18n="missing_db">DB namespace missing!</span></div>` : ''}
               <div class="relative mb-6">
                   <input type="password" id="pwd" data-i18n="pass_ph" placeholder="Master Key" class="w-full px-5 py-4 rounded-xl border-2 border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-darkbg focus:border-primary outline-none text-center tracking-widest pe-12">
-                  <button type="button" onclick="const n=document.getElementById('pwd');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
+                  <button type="button" onclick="const n=document.getElementById('pwd');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
               </div>
               <button onclick="doLogin()" class="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:opacity-90" data-i18n="login_btn">Authenticate</button>
               <p id="err-msg" class="text-red-500 text-sm mt-4 hidden text-center font-bold" data-i18n="err_pass">Invalid Key</p>
@@ -1120,7 +1432,7 @@ function getDashboardUI(hasDB) {
                           <div class="flex gap-2 w-full sm:w-auto shrink-0 justify-end">
                               <button onclick="dismissUpdate()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-colors" data-i18n="btn_cancel">Cancel</button>
                               <a id="update-alert-btn" href="https://github.com/itsyebekhe/nahan" target="_blank" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5" data-i18n="update_btn">
-                                  Get Latest Code ➜
+                                  Get Latest Code 鉃�
                               </a>
                           </div>
                       </div>
@@ -1133,9 +1445,9 @@ function getDashboardUI(hasDB) {
                       <!-- NETWORK/METRICS VIEW -->
                       <div id="view-network" class="hidden space-y-6">
                             <div class="bg-white dark:bg-darkcard rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-darkborder mb-6">
-                              <h3 class="text-sm uppercase font-bold text-slate-500 tracking-wider mb-4">Live Profile Usage</h3>
+                              <h3 class="text-sm uppercase font-bold text-slate-500 tracking-wider mb-4" data-i18n="metrics_live">Live Profile Usage</h3>
                               <div id="usage-metrics-container" class="flex flex-col">
-                                  <p class="text-xs text-slate-400 text-center py-4">No active connection data yet.</p>
+                                  <p class="text-xs text-slate-400 text-center py-4" data-i18n="no_metrics">No active connection data yet.</p>
                               </div>
                           </div>
                           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -1162,25 +1474,25 @@ function getDashboardUI(hasDB) {
                                           <h3 class="text-sm uppercase font-bold text-slate-400 mb-1" data-i18n="ping_test_title">Latency Diagnostics</h3>
                                           <p class="text-xs text-slate-500" data-i18n="ping_test_desc">Test response time to your active node target.</p>
                                       </div>
-                                      <button onclick="runPingTest()" class="px-6 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-colors text-sm">
-                                          ⚡ Run Diagnostics
+                                      <button onclick="runPingTest()" class="px-6 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-colors text-sm" data-i18n="run_diagnostics">
+                                          鈿� Run Diagnostics
                                       </button>
                                   </div>
                                   <div id="ping-results" class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 hidden">
                                       <div class="bg-slate-50 dark:bg-darkbg p-3 rounded-xl border border-slate-100 dark:border-darkborder/50">
-                                          <p class="text-[10px] uppercase font-bold text-slate-400">Target Node</p>
+                                          <p class="text-[10px] uppercase font-bold text-slate-400" data-i18n="target_node">Target Node</p>
                                           <p id="ping-target" class="text-sm font-bold font-mono truncate">...</p>
                                       </div>
                                       <div class="bg-slate-50 dark:bg-darkbg p-3 rounded-xl border border-slate-100 dark:border-darkborder/50">
-                                          <p class="text-[10px] uppercase font-bold text-slate-400">Response</p>
+                                          <p class="text-[10px] uppercase font-bold text-slate-400" data-i18n="response">Response</p>
                                           <p id="ping-time" class="text-sm font-bold font-mono text-emerald-500">...</p>
                                       </div>
                                       <div class="bg-slate-50 dark:bg-darkbg p-3 rounded-xl border border-slate-100 dark:border-darkborder/50">
-                                          <p class="text-[10px] uppercase font-bold text-slate-400">Status</p>
+                                          <p class="text-[10px] uppercase font-bold text-slate-400" data-i18n="status">Status</p>
                                           <p id="ping-status" class="text-sm font-bold">...</p>
                                       </div>
                                       <div class="bg-slate-50 dark:bg-darkbg p-3 rounded-xl border border-slate-100 dark:border-darkborder/50">
-                                          <p class="text-[10px] uppercase font-bold text-slate-400">Local Port</p>
+                                          <p class="text-[10px] uppercase font-bold text-slate-400" data-i18n="local_port">Local Port</p>
                                           <p id="ping-port" class="text-sm font-bold font-mono">...</p>
                                       </div>
                                   </div>
@@ -1232,7 +1544,7 @@ function getDashboardUI(hasDB) {
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_pass">Master Key</label>
                                   <div class="relative">
                                       <input type="password" id="cfg-pass" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none pe-12">
-                                      <button type="button" onclick="const n=document.getElementById('cfg-pass');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
+                                      <button type="button" onclick="const n=document.getElementById('cfg-pass');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
                                   </div>
                               </div>
                               <div class="space-y-1 md:col-span-2 font-mono">
@@ -1244,11 +1556,11 @@ function getDashboardUI(hasDB) {
                               <div class="bg-white dark:bg-darkcard rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-darkborder md:col-span-2 space-y-4">
                                   <h3 class="text-sm uppercase font-bold text-slate-400 tracking-wider" data-i18n="backup_restore_title">Backup & Restore</h3>
                                   <div class="flex flex-col sm:flex-row gap-4">
-                                      <button onclick="exportConfig()" class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors text-sm">
-                                          📥 Export Configuration (JSON)
+                                      <button onclick="exportConfig()" class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors text-sm" data-i18n="export_btn">
+                                          馃摜 Export Configuration (JSON)
                                       </button>
                                       <label class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors text-sm text-center cursor-pointer">
-                                          📤 Import Configuration (JSON)
+                                          <span data-i18n="import_btn">馃摛 Import Configuration (JSON)</span>
                                           <input type="file" id="import-file" class="hidden" accept=".json" onchange="importConfig(event)">
                                       </label>
                                   </div>
@@ -1274,16 +1586,16 @@ function getDashboardUI(hasDB) {
                               <div class="flex items-center justify-between mb-2">
                                   <h3 class="text-sm uppercase font-black text-indigo-800 dark:text-indigo-300 tracking-wider flex items-center">
                                       <svg class="w-5 h-5 me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                                      Slave Worker Nodes
+                                      <span data-i18n="slave_title">Slave Worker Nodes</span>
                                   </h3>
                               </div>
-                              <p class="text-xs text-indigo-600/80 dark:text-indigo-300/70 mb-4 leading-relaxed">Enter your other worker Domains (one per line). Master will push settings and users to them automatically, and include them in load-balanced subscriptions!</p>
+                              <p class="text-xs text-indigo-600/80 dark:text-indigo-300/70 mb-4 leading-relaxed" data-i18n="slave_desc">Enter your other worker Domains (one per line). Master will push settings and users to them automatically, and include them in load-balanced subscriptions!</p>
                               <div class="relative">
                                   <textarea id="cfg-nodes" rows="3" placeholder="node1.worker.dev&#10;node2.domain.com" class="w-full px-4 py-3 pb-12 rounded-xl border border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-slate-900 focus:border-indigo-500 focus:ring-1 outline-none font-mono text-sm resize-none scrollbar-hide text-slate-700 dark:text-slate-300 placeholder:text-indigo-200 dark:placeholder:text-indigo-800/50"></textarea>
                                   <div class="absolute bottom-3 end-3">
                                       <button onclick="forceSyncNodes()" type="button" class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition-colors flex items-center shadow-sm">
                                           <svg id="sync-icon" class="w-3.5 h-3.5 me-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                          <span id="sync-btn-txt">Force Sync Now</span>
+                                          <span id="sync-btn-txt" data-i18n="force_sync">Force Sync Now</span>
                                       </button>
                                   </div>
                               </div>
@@ -1301,7 +1613,7 @@ function getDashboardUI(hasDB) {
                                   <input type="text" id="cfg-dns" placeholder="1.1.1.1" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm">
                               </div>
                               <div class="space-y-1 text-start">
-                                  <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1">Custom DNS (DoH Provider)</label>
+                                  <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_doh">Custom DNS (DoH Provider)</label>
                                   <input type="text" id="cfg-custom-dns" placeholder="https://cloudflare-dns.com/dns-query" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm">
                               </div>
                               <div class="space-y-1 md:col-span-2 text-start">
@@ -1311,6 +1623,24 @@ function getDashboardUI(hasDB) {
                               <div class="space-y-1 md:col-span-2 text-start">
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_relay">Backup Relay IP</label>
                                   <input type="text" id="cfg-relay" placeholder="proxyip.cmliussss.net" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm">
+                              </div>
+                          </div>
+  
+                          <!-- Custom Name Strategy -->
+                          <div class="bg-white dark:bg-darkcard rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-darkborder grid grid-cols-1 md:grid-cols-2 gap-5 mt-6">
+                              <div class="space-y-1 text-start">
+                                  <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_strategy">Configuration Name Strategy</label>
+                                  <select id="cfg-name-strategy" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none appearance-none">
+                                      <option value="default">Default Core Name (e.g. V-Core-443-User)</option>
+                                      <option value="type-user-port">Protocol-User-Port (e.g. vless-User-443)</option>
+                                      <option value="user-port">User-Port (e.g. User-443)</option>
+                                      <option value="host-port-user">Hostname-Port-User</option>
+                                      <option value="prefix-user-port">Custom Prefix-User-Port</option>
+                                  </select>
+                              </div>
+                              <div class="space-y-1 text-start">
+                                  <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_prefix">Custom Name Prefix</label>
+                                  <input type="text" id="cfg-name-prefix" placeholder="Core" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm">
                               </div>
                           </div>
   
@@ -1358,7 +1688,7 @@ function getDashboardUI(hasDB) {
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_tg_token">Token Bot</label>
                                   <div class="relative">
                                       <input type="password" id="cfg-tg-token" placeholder="123456:ABC-DEF1234ghIkl-zyx5c" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm pe-12">
-                                      <button type="button" onclick="const n=document.getElementById('cfg-tg-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
+                                      <button type="button" onclick="const n=document.getElementById('cfg-tg-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
                                   </div>
                               </div>
                               <div class="space-y-1 text-start">
@@ -1378,14 +1708,14 @@ function getDashboardUI(hasDB) {
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_cf_token">CF API Token</label>
                                   <div class="relative">
                                       <input type="password" id="cfg-cf-token" placeholder="Bearer Token (Read Analytics)" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm font-mono pe-12">
-                                      <button type="button" onclick="const n=document.getElementById('cfg-cf-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
+                                      <button type="button" onclick="const n=document.getElementById('cfg-cf-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
                                   </div>
                               </div>
                               <p class="text-xs text-slate-400 md:col-span-2" data-i18n="desc_cf_api">Optional: Monitor Worker free usage limits (100k/day). Needs Account Analytics Read permission.</p>
                           </div>
                       </div>
                       
-                      <!-- USERS VIEW - Enhanced with Volume Limit -->
+                      <!-- USERS VIEW -->
                       <div id="view-users" class="hidden space-y-6">
                           <div class="bg-white dark:bg-darkcard rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-darkborder relative overflow-hidden">
                               <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
@@ -1401,8 +1731,7 @@ function getDashboardUI(hasDB) {
                                           <tr>
                                               <th class="px-4 py-3 rounded-s-xl" data-i18n="tbl_name">Name</th>
                                               <th class="px-4 py-3" data-i18n="tbl_uuid">UUID</th>
-                                              <th class="px-4 py-3">Volume (Used / Limit)</th>
-                                              <th class="px-4 py-3" data-i18n="tbl_traffic">Requests</th>
+                                              <th class="px-4 py-3" data-i18n="tbl_traffic">Traffic (Used / Limit)</th>
                                               <th class="px-4 py-3" data-i18n="tbl_exp">Expiration</th>
                                               <th class="px-4 py-3 rounded-e-xl text-end" data-i18n="tbl_action">Action</th>
                                           </tr>
@@ -1414,7 +1743,7 @@ function getDashboardUI(hasDB) {
                           </div>
                       </div>
 
-                      <!-- Modal: Add User with Volume Field -->
+                      <!-- Modal: Add User -->
                       <div id="modal-add-user" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
                           <div class="bg-white dark:bg-darkcard rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-darkborder">
                               <h3 class="text-xl font-bold mb-4" data-i18n="modal_add_title">Add User</h3>
@@ -1424,25 +1753,50 @@ function getDashboardUI(hasDB) {
                                       <input type="text" id="add-user-name" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
                                   </div>
                                   <div>
-                                      <label class="block text-xs font-bold text-slate-500 mb-1">Volume Limit (GB) - Optional</label>
-                                      <input type="number" id="add-user-bytes" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none" placeholder="e.g., 50 for 50 GB">
-                                      <p class="text-[10px] text-slate-400 mt-1">Leave empty for unlimited volume</p>
-                                  </div>
-                                  <div>
-                                      <label class="block text-xs font-bold text-slate-500 mb-1">Total Requests Limit (Optional)</label>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1">Total Requests Limit (Leave empty for unlimited)</label>
                                       <input type="number" id="add-user-total-reqs" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
                                   </div>
                                   <div>
-                                      <label class="block text-xs font-bold text-slate-500 mb-1">Daily Requests Limit (Optional)</label>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1">Daily Requests Limit (Leave empty for unlimited)</label>
                                       <input type="number" id="add-user-daily-reqs" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
                                   </div>
                                   <div>
-                                      <label class="block text-xs font-bold text-slate-500 mb-1" data-i18n="lbl_u_days">Expiration limit (Days) - Optional</label>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1" data-i18n="lbl_u_days">Expiration limit (Days) - Leave empty for unlimited</label>
                                       <input type="number" id="add-user-days" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
                                   </div>
                                   <div class="flex justify-end gap-2 mt-6">
                                       <button onclick="document.getElementById('modal-add-user').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold" data-i18n="btn_cancel">Cancel</button>
                                       <button onclick="commitAddUser()" class="px-4 py-2 rounded-xl bg-primary text-white font-bold" data-i18n="btn_confirm">Save User</button>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <!-- Modal: Edit User -->
+                      <div id="modal-edit-user" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                          <div class="bg-white dark:bg-darkcard rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-darkborder">
+                              <h3 class="text-xl font-bold mb-4">Edit Subscriber</h3>
+                              <input type="hidden" id="edit-user-id">
+                              <div class="space-y-4">
+                                  <div>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1">Name / Identifier</label>
+                                      <input type="text" id="edit-user-name" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1">Total Requests Limit (Leave empty for unlimited)</label>
+                                      <input type="number" id="edit-user-total-reqs" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1">Daily Requests Limit (Leave empty for unlimited)</label>
+                                      <input type="number" id="edit-user-daily-reqs" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
+                                  </div>
+                                  <div>
+                                      <label class="block text-xs font-bold text-slate-500 mb-1">Expiration limit (Days remaining) - Leave empty for unlimited</label>
+                                      <input type="number" id="edit-user-days" class="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none">
+                                  </div>
+                                  <div class="flex justify-end gap-2 mt-6">
+                                      <button onclick="document.getElementById('modal-edit-user').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">Cancel</button>
+                                      <button onclick="commitEditUser()" class="px-4 py-2 rounded-xl bg-primary text-white font-bold">Save Changes</button>
                                   </div>
                               </div>
                           </div>
@@ -1454,7 +1808,7 @@ function getDashboardUI(hasDB) {
                               <div class="flex items-center justify-between mb-6">
                                   <h3 class="text-sm uppercase font-bold text-slate-500 tracking-wider">System Activity Logs</h3>
                                   <button onclick="loadLogs()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors">
-                                      🔄 Refresh
+                                      馃攧 Refresh
                                   </button>
                               </div>
                               <div class="space-y-3" id="logs-container">
@@ -1479,7 +1833,7 @@ function getDashboardUI(hasDB) {
                   <span class="text-[10px] font-bold" data-i18n="tab_info">Endpoints</span>
               </button>
               <button onclick="switchTab('network')" id="mob-tab-network" class="mobile-nav-item flex flex-col items-center justify-center w-full h-full text-slate-400">
-                  <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                  <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012-2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                   <span class="text-[10px] font-bold" data-i18n="tab_status">Metrics</span>
               </button>
               <button onclick="switchTab('settings')" id="mob-tab-settings" class="mobile-nav-item flex flex-col items-center justify-center w-full h-full text-slate-400">
@@ -1526,7 +1880,7 @@ function getDashboardUI(hasDB) {
       <script>
           const i18n = {
               en: {
-                  title: "Nahan Gateway", pass_ph: "Master Key", login_btn: "Authenticate", err_pass: "Access Denied", missing_db: "⚠️ IOT_DB namespace missing! Settings won't save.",
+                  title: "Nahan Gateway", pass_ph: "Master Key", login_btn: "Authenticate", err_pass: "Access Denied", missing_db: "鈿狅笍 IOT_DB namespace missing! Settings won't save.",
                   logout: "Disconnect", tab_info: "Endpoints", tab_status: "Metrics", tab_settings: "System", tab_adv: "Advanced", tab_logs: "Activity Logs",
                   qr_title: "Direct Stream Link", badge_multi: "Dual-Core Multiplexed", copy: "Copy", copied: "Copied to clipboard!", sync_link: "Cloud Sync URL", active_id: "Hardware ID",
                   stat_ip: "Origin IP", stat_dc: "Edge Node", stat_loc: "Data Region",
@@ -1542,26 +1896,42 @@ function getDashboardUI(hasDB) {
                   modal_add_title: "Add New User", lbl_u_name: "Name (Required)", lbl_u_gb: "Traffic Limit (GB) - Optional", lbl_u_days: "Duration (Days) - Optional", btn_cancel: "Cancel", btn_confirm: "Add User",
                   save_btn: "Update Config", msg_saving: "Syncing...", msg_saved: "Success! Reloading...", msg_err: "Sync Error",
                   backup_restore_title: "Backup & Restore", ping_test_title: "Latency Diagnostics", ping_test_desc: "Test response time to your active node target.",
-                  lbl_github_repo: "GitHub Update Repository", update_avail: "New version available!", update_btn: "Get Latest Code"
+                  lbl_github_repo: "GitHub Update Repository", update_avail: "New version available!", update_btn: "Get Latest Code",
+                  metrics_live: "Live Profile Usage", no_metrics: "No active connection data yet.", run_diagnostics: "鈿� Run Diagnostics",
+                  target_node: "Target Node", response: "Response", status: "Status", local_port: "Local Port",
+                  lbl_doh: "Custom DNS (DoH Provider)", lbl_strategy: "Configuration Name Strategy", lbl_prefix: "Custom Name Prefix",
+                  slave_title: "Slave Worker Nodes", slave_desc: "Enter your other worker Domains (one per line). Master will push settings and users to them automatically, and include them in load-balanced subscriptions!",
+                  force_sync: "Force Sync Now", limit_total: "Total Requests Limit (Leave empty for unlimited)", limit_daily: "Daily Requests Limit (Leave empty for unlimited)",
+                  limit_days: "Expiration limit (Days) - Leave empty for unlimited", edit_sub: "Edit Subscriber", lbl_name_ph: "Name / Identifier",
+                  btn_save_changes: "Save Changes", save_btn_user: "Save User", status_active: "Active", status_paused: "Paused", status_expired: "Expired",
+                  export_btn: "馃摜 Export Configuration (JSON)", import_btn: "馃摛 Import Configuration (JSON)"
               },
               fa: {
-                  title: "دروازه نهان", pass_ph: "کلید اصلی", login_btn: "ورود به سیستم", err_pass: "دسترسی مسدود شد", missing_db: "⚠️ فضای IOT_DB یافت نشد! تنظیمات ذخیره نمی‌شوند.",
-                  logout: "خروج", tab_info: "نقاط اتصال", tab_status: "وضعیت شبکه", tab_settings: "تنظیمات پایه", tab_adv: "پیشرفته", tab_logs: "گزارش فعالیت",
-                  qr_title: "لینک اتصال مستقیم", badge_multi: "ترکیب دوگانه V+T", copy: "کپی", copied: "در حافظه کپی شد!", sync_link: "لینک ساب (Cloud Sync)", active_id: "شناسه سخت‌افزار",
-                  stat_ip: "آی‌پی مبدا", stat_dc: "گره لبه", stat_loc: "منطقه داده",
-                  lbl_proto: "پروتکل نمایش مستقیم", lbl_port: "پورت داده", lbl_id: "شناسه یکتا (خالی=خودکار)",
-                  lbl_path: "مسیر مخفی API", lbl_pass: "کلید اصلی", lbl_fp: "امضای TLS", lbl_dns: "آی‌پی تحلیلگر",
-                  lbl_clean_ips: "آی‌پی‌های تمیز (مولد چندگانه)", ph_clean_ips: "1.1.1.1, 2.2.2.2", desc_clean_ips: "آی‌پی ها را با کاما یا خط جدید جدا کنید. لینک ساب برای همه ترکیب می‌سازد.",
-                  lbl_fake: "سایت‌های استتار (حالت مخفی)", lbl_relay: "آی‌پی جایگزین (Proxy IP)", lbl_tfo: "اتصال سریع (TFO)", lbl_ech: "سلام امن (ECH)", lbl_tg_token: "توکن ربات تلگرام", lbl_tg_chat: "آیدی عددی تلگرام (Chat ID)", desc_tg_bot: "با تنظیم این مقادیر، جزئیات ورود به پنل به تلگرام ارسال می‌شود.",
-                  lbl_cf_acc: "آیدی اکانت کلودفلر (Account ID)", lbl_cf_token: "توکن کلودفلر (API Token)", desc_cf_api: "اختیاری: برای نمایش میزان مصرف روزانه کارگر از 100 هزار درخواست رایگان در پیام‌های تلگرام.",
-                  lbl_silent: "هشدار و پیغام خاموش", lbl_pause: "کلید توقف اضطراری",
-                  tab_users: "کاربران",
-                  user_mgt_title: "مدیریت کاربران", user_mgt_desc: "مدیریت کاربران متعدد، تنظیم محدودیت ترافیک، و تاریخ انقضا.", btn_add_user: "+ افزودن کاربر جدید",
-                  tbl_name: "نام", tbl_uuid: "شناسه یکتا", tbl_traffic: "ترافیک (مصرفی/محدودیت)", tbl_exp: "انقضا", tbl_action: "عملیات", no_users: "کاربری یافت نشد. از دکمه بالا یک کاربر ایجاد کنید.",
-                  modal_add_title: "افزودن کاربر جدید", lbl_u_name: "نام (الزامی)", lbl_u_gb: "محدودیت ترافیک (گیگابایت) - اختیاری", lbl_u_days: "مدت زمان اعتبار (روز) - اختیاری", btn_cancel: "انصراف", btn_confirm: "افزودن کاربر",
-                  save_btn: "ذخیره تنظیمات", msg_saving: "در حال ثبت...", msg_saved: "موفق! در حال بارگذاری...", msg_err: "خطای ارتباط",
-                  backup_restore_title: "پشتیبان‌گیری و بازیابی", ping_test_title: "عیب‌یابی تاخیر شبکه", ping_test_desc: "تاخیر پاسخ‌دهی را به آی‌پی تمیز فعال اندازه بگیرید.",
-                  lbl_github_repo: "مخزن گیت‌هاب جهت آپدیت", update_avail: "بروزرسانی جدید در دسترس است!", update_btn: "دریافت آخرین کد"
+                  title: "丿乇賵丕夭賴 賳賴丕賳", pass_ph: "讴賱蹖丿 丕氐賱蹖", login_btn: "賵乇賵丿 亘賴 爻蹖爻鬲賲", err_pass: "丿爻鬲乇爻蹖 賲爻丿賵丿 卮丿", missing_db: "鈿狅笍 賮囟丕蹖 IOT_DB 蹖丕賮鬲 賳卮丿! 鬲賳馗蹖賲丕鬲 匕禺蹖乇賴 賳賲蹖鈥屫促堎嗀�.",
+                  logout: "禺乇賵噩", tab_info: "賳賯丕胤 丕鬲氐丕賱", tab_status: "賵囟毓蹖鬲 卮亘讴賴", tab_settings: "鬲賳馗蹖賲丕鬲 倬丕蹖賴", tab_adv: "倬蹖卮乇賮鬲賴", tab_logs: "诏夭丕乇卮 賮毓丕賱蹖鬲",
+                  qr_title: "賱蹖賳讴 丕鬲氐丕賱 賲爻鬲賯蹖賲", badge_multi: "鬲乇讴蹖亘 丿賵诏丕賳賴 V+T", copy: "讴倬蹖", copied: "丿乇 丨丕賮馗賴 讴倬蹖 卮丿!", sync_link: "賱蹖賳讴 爻丕亘 (Cloud Sync)", active_id: "卮賳丕爻賴 爻禺鬲鈥屫з佖藏ж�",
+                  stat_ip: "丌蹖鈥屬聚� 賲亘丿丕", stat_dc: "诏乇賴 賱亘賴", stat_loc: "賲賳胤賯賴 丿丕丿賴",
+                  lbl_proto: "倬乇賵鬲讴賱 賳賲丕蹖卮 賲爻鬲賯蹖賲", lbl_port: "倬賵乇鬲 丿丕丿賴", lbl_id: "卮賳丕爻賴 蹖讴鬲丕 (禺丕賱蹖=禺賵丿讴丕乇)",
+                  lbl_path: "賲爻蹖乇 賲禺賮蹖 API", lbl_pass: "讴賱蹖丿 丕氐賱蹖", lbl_fp: "丕賲囟丕蹖 TLS", lbl_dns: "丌蹖鈥屬聚� 鬲丨賱蹖賱诏乇",
+                  lbl_clean_ips: "丌蹖鈥屬聚屸€屬囏й� 鬲賲蹖夭 (賲賵賱丿 趩賳丿诏丕賳賴)", ph_clean_ips: "1.1.1.1, 2.2.2.2", desc_clean_ips: "丌蹖鈥屬聚� 賴丕 乇丕 亘丕 讴丕賲丕 蹖丕 禺胤 噩丿蹖丿 噩丿丕 讴賳蹖丿. 賱蹖賳讴 爻丕亘 亘乇丕蹖 賴賲賴 鬲乇讴蹖亘 賲蹖鈥屫池ж藏�.",
+                  lbl_fake: "爻丕蹖鬲鈥屬囏й� 丕爻鬲鬲丕乇 (丨丕賱鬲 賲禺賮蹖)", lbl_relay: "丌蹖鈥屬聚� 噩丕蹖诏夭蹖賳 (Proxy IP)", lbl_tfo: "丕鬲氐丕賱 爻乇蹖毓 (TFO)", lbl_ech: "爻賱丕賲 丕賲賳 (ECH)", lbl_tg_token: "鬲賵讴賳 乇亘丕鬲 鬲賱诏乇丕賲", lbl_tg_chat: "丌蹖丿蹖 毓丿丿蹖 鬲賱诏乇丕賲 (Chat ID)", desc_tg_bot: "亘丕 鬲賳馗蹖賲 丕蹖賳 賲賯丕丿蹖乇貙 噩夭卅蹖丕鬲 賵乇賵丿 亘賴 倬賳賱 亘賴 鬲賱诏乇丕賲 丕乇爻丕賱 賲蹖鈥屫促堌�.",
+                  lbl_cf_acc: "丌蹖丿蹖 丕讴丕賳鬲 讴賱賵丿賮賱乇 (Account ID)", lbl_cf_token: "鬲賵讴賳 讴賱賵丿賮賱乇 (API Token)", desc_cf_api: "丕禺鬲蹖丕乇蹖: 亘乇丕蹖 賳賲丕蹖卮 賲蹖夭丕賳 賲氐乇賮 乇賵夭丕賳賴 讴丕乇诏乇 丕夭 100 賴夭丕乇 丿乇禺賵丕爻鬲 乇丕蹖诏丕賳 丿乇 倬蹖丕賲鈥屬囏й� 鬲賱诏乇丕賲.",
+                  lbl_silent: "賴卮丿丕乇 賵 倬蹖睾丕賲 禺丕賲賵卮", lbl_pause: "讴賱蹖丿 鬲賵賯賮 丕囟胤乇丕乇蹖",
+                  tab_users: "讴丕乇亘乇丕賳",
+                  user_mgt_title: "賲丿蹖乇蹖鬲 讴丕乇亘乇丕賳", user_mgt_desc: "賲丿蹖乇蹖鬲 讴丕乇亘乇丕賳 賲鬲毓丿丿貙 鬲賳馗蹖賲 賲丨丿賵丿蹖鬲 鬲乇丕賮蹖讴貙 賵 鬲丕乇蹖禺 丕賳賯囟丕.", btn_add_user: "+ 丕賮夭賵丿賳 讴丕乇亘乇 噩丿蹖丿",
+                  tbl_name: "賳丕賲", tbl_uuid: "卮賳丕爻賴 蹖讴鬲丕", tbl_traffic: "鬲乇丕賮蹖讴 (賲氐乇賮蹖/賲丨丿賵丿蹖鬲)", tbl_exp: "丕賳賯囟丕", tbl_action: "毓賲賱蹖丕鬲", no_users: "讴丕乇亘乇蹖 蹖丕賮鬲 賳卮丿. 丕夭 丿讴賲賴 亘丕賱丕 蹖讴 讴丕乇亘乇 丕蹖噩丕丿 讴賳蹖丿.",
+                  modal_add_title: "丕賮夭賵丿賳 讴丕乇亘乇 噩丿蹖丿", lbl_u_name: "賳丕賲 (丕賱夭丕賲蹖)", lbl_u_gb: "賲丨丿賵丿蹖鬲 鬲乇丕賮蹖讴 (诏蹖诏丕亘丕蹖鬲) - 丕禺鬲蹖丕乇蹖", lbl_u_days: "賲丿鬲 夭賲丕賳 丕毓鬲亘丕乇 (乇賵夭) - 丕禺鬲蹖丕乇蹖", btn_cancel: "丕賳氐乇丕賮", btn_confirm: "丕賮夭賵丿賳 讴丕乇亘乇",
+                  save_btn: "匕禺蹖乇賴 鬲賳馗蹖賲丕鬲", msg_saving: "丿乇 丨丕賱 孬亘鬲...", msg_saved: "賲賵賮賯! 丿乇 丨丕賱 亘丕乇诏匕丕乇蹖...", msg_err: "禺胤丕蹖 丕乇鬲亘丕胤",
+                  backup_restore_title: "倬卮鬲蹖亘丕賳鈥屭屫臂� 賵 亘丕夭蹖丕亘蹖", ping_test_title: "毓蹖亘鈥屰屫жㄛ� 鬲丕禺蹖乇 卮亘讴賴", ping_test_desc: "鬲丕禺蹖乇 倬丕爻禺鈥屫囒� 乇丕 亘賴 丌蹖鈥屬聚� 鬲賲蹖夭 賮毓丕賱 丕賳丿丕夭賴 亘诏蹖乇蹖丿.",
+                  lbl_github_repo: "賲禺夭賳 诏蹖鬲鈥屬囏ж� 噩賴鬲 丌倬丿蹖鬲", update_avail: "亘乇賵夭乇爻丕賳蹖 噩丿蹖丿 丿乇 丿爻鬲乇爻 丕爻鬲!", update_btn: "丿乇蹖丕賮鬲 丌禺乇蹖賳 讴丿",
+                  metrics_live: "賵囟毓蹖鬲 夭賳丿賴 賲氐乇賮 丕鬲氐丕賱丕鬲 賵 倬乇丿丕夭卮", no_metrics: "賴賳賵夭 丿丕丿賴鈥屫й� 丕夭 鬲乇丕讴賳卮 賵 丕鬲氐丕賱丕鬲 賮毓丕賱 孬亘鬲 賳卮丿賴 丕爻鬲.", run_diagnostics: "鈿� 丕噩乇丕蹖 毓蹖亘鈥屰屫жㄛ� 卮亘讴賴",
+                  target_node: "賴丿賮 诏乇賴 卮亘讴賴", response: "賲丿鬲 鬲丕禺蹖乇 (Latency)", status: "賵囟毓蹖鬲 诏乇賴", local_port: "丿乇诏丕賴 賲丨賱蹖",
+                  lbl_doh: "鬲丨賱蹖賱鈥屭� 鬲禺氐氐蹖 DNS (爻乇賵蹖爻 DoH)", lbl_strategy: "乇賵卮 賳丕賲鈥屭柏ж臂� 讴丕賳賮蹖诏鈥屬囏�", lbl_prefix: "倬蹖卮賵賳丿 賳丕賲 讴丕賳賮蹖诏鈥屬囏�",
+                  slave_title: "爻丕蹖乇 賳賵丿賴丕蹖 賲賵丕夭蹖 (Slaves)", slave_desc: "丌丿乇爻 丿丕賲賳賴 爻丕蹖乇 賵乇讴乇賴丕 乇丕 賵丕乇丿 賳賲丕蹖蹖丿 (賴乇 禺胤 蹖讴 丿丕賲賳賴). 賳賵丿 丕氐賱蹖 鬲賳馗蹖賲丕鬲 賵 賲卮鬲乇讴蹖賳 乇丕 亘賴 氐賵乇鬲 禺賵丿讴丕乇 亘丕 丌賳鈥屬囏� 賴賲丕賴賳诏 賲蹖鈥屭┵嗀�!",
+                  force_sync: "賴賲诏丕賲鈥屫池ж槽� 丕噩亘丕乇蹖 賳賵丿賴丕", limit_total: "賲丨丿賵丿蹖鬲 鬲毓丿丕丿 讴賱 丿乇禺賵丕爻鬲鈥屬囏� (亘乇丕蹖 賳丕賲丨丿賵丿 禺丕賱蹖 亘诏匕丕乇蹖丿)", limit_daily: "賲丨丿賵丿蹖鬲 丿乇禺賵丕爻鬲鈥屬囏й� 乇賵夭丕賳賴 (亘乇丕蹖 賳丕賲丨丿賵丿 禺丕賱蹖 亘诏匕丕乇蹖丿)",
+                  limit_days: "賲丿鬲 夭賲丕賳 丕毓鬲亘丕乇 賯丕賳賵賳蹖 (乇賵夭) - 亘乇丕蹖 賳丕賲丨丿賵丿 禺丕賱蹖 亘诏匕丕乇蹖丿", edit_sub: "賵蹖乇丕蹖卮 賲卮禺氐丕鬲 賲卮鬲乇讴", lbl_name_ph: "賳丕賲 蹖丕 卮賳丕爻賴 蹖讴鬲丕",
+                  btn_save_changes: "匕禺蹖乇賴 鬲睾蹖蹖乇丕鬲", save_btn_user: "孬亘鬲 讴丕乇亘乇 噩丿蹖丿", status_active: "賮毓丕賱", status_paused: "賲鬲賵賯賮 卮丿賴", status_expired: "賲賳賯囟蹖 卮丿賴",
+                  export_btn: "馃摜 亘乇賵賳鈥屫ㄘ臂� 賮丕蹖賱 倬蹖讴乇亘賳丿蹖 (JSON)", import_btn: "馃摛 丿乇賵賳鈥屫臂屫槽� 賮丕蹖賱 倬蹖讴乇亘賳丿蹖 (JSON)"
               }
           };
   
@@ -1586,7 +1956,7 @@ function getDashboardUI(hasDB) {
   
           function applyLang() {
               document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
-              document.getElementById('lang-toggle').innerText = lang === 'fa' ? 'EN' : 'فا';
+              document.getElementById('lang-toggle').innerText = lang === 'fa' ? 'EN' : '賮丕';
               document.querySelectorAll('[data-i18n]').forEach(el => {
                   const key = el.getAttribute('data-i18n');
                   if(el.placeholder !== undefined && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) el.placeholder = i18n[lang][key];
@@ -1694,6 +2064,7 @@ function getDashboardUI(hasDB) {
                   if (document.getElementById('cfg-ech').checked) rawLink += "&pbk=enabled";
                   rawLink += "#" + hostName;
   
+                  // FIX: Check if elements exist
                   const linkEl = document.getElementById('link-direct');
                   if (linkEl) linkEl.value = rawLink;
   
@@ -1702,7 +2073,7 @@ function getDashboardUI(hasDB) {
   
                   let totalIps = ipsList.length === 0 ? 1 : ipsList.length;
                   let tCfg = totalIps * 2; 
-                  document.getElementById('ip-count-badge').innerText = lang === 'fa' ? (tCfg + ' کانفیگ تولید شد') : (tCfg + ' Configs Active');
+                  document.getElementById('ip-count-badge').innerText = lang === 'fa' ? (tCfg + ' 讴丕賳賮蹖诏 鬲賵賱蹖丿 卮丿') : (tCfg + ' Configs Active');
               } catch(e) { console.error(e); }
           }
   
@@ -1711,6 +2082,7 @@ function getDashboardUI(hasDB) {
               window.location.reload();
           }
   
+          // Export active page inputs configuration
           function exportConfig() {
               const el = id => document.getElementById(id);
               const payload = {
@@ -1732,6 +2104,7 @@ function getDashboardUI(hasDB) {
               dlAnchor.remove();
           }
   
+          // Import backup json to overwrite config inputs 
           function importConfig(event) {
               const file = event.target.files[0];
               if (!file) return;
@@ -1764,14 +2137,15 @@ function getDashboardUI(hasDB) {
                       if (conf.silentAlerts !== undefined) document.getElementById('cfg-silent').checked = conf.silentAlerts;
                       
                       updateUI();
-                      alert(lang === 'fa' ? 'پیکربندی با موفقیت وارد شد! روی ذخیره کلیک کنید.' : 'Configuration parsed! Click save to write changes.');
+                      alert(lang === 'fa' ? '倬蹖讴乇亘賳丿蹖 亘丕 賲賵賮賯蹖鬲 賵丕乇丿 卮丿! 乇賵蹖 匕禺蹖乇賴 讴賱蹖讴 讴賳蹖丿.' : 'Configuration parsed! Click save to write changes.');
                   } catch(err) {
-                      alert(lang === 'fa' ? 'فایل نامعتبر است!' : 'Invalid configuration file!');
+                      alert(lang === 'fa' ? '賮丕蹖賱 賳丕賲毓鬲亘乇 丕爻鬲!' : 'Invalid configuration file!');
                   }
               };
               reader.readAsText(file);
           }
   
+          // Browser-level latency check diagnostics
           async function runPingTest() {
               const rawIps = document.getElementById('cfg-ips').value || "";
               let ipsList = rawIps.replace(/,/g, '\\n').replace(/;/g, '\\n').split('\\n').map(s=>s.trim()).filter(Boolean);
@@ -1850,6 +2224,8 @@ function getDashboardUI(hasDB) {
                       document.getElementById('cfg-pause').checked = conf.isPaused || false;
                       document.getElementById('cfg-silent').checked = conf.silentAlerts || false;
                       document.getElementById('cfg-github-repo').value = conf.githubRepo || 'itsyebekhe/nahan';
+                      document.getElementById('cfg-name-strategy').value = conf.nameStrategy || 'default';
+                      document.getElementById('cfg-name-prefix').value = conf.namePrefix || 'Core';
   
                       window.nahanConfig = JSON.parse(JSON.stringify(conf));
                       window.nahanUsage = data.sysUsage || {};
@@ -1857,7 +2233,7 @@ function getDashboardUI(hasDB) {
                       renderUsersTable();
                       try { checkUpdate(); } catch(ue) { console.error(ue); }
 
-                      ['cfg-proto','cfg-port','cfg-fp','cfg-ips','cfg-nodes','cfg-path', 'cfg-relay'].forEach(id => {
+                      ['cfg-proto','cfg-port','cfg-fp','cfg-ips','cfg-nodes','cfg-path', 'cfg-relay', 'cfg-name-strategy', 'cfg-name-prefix'].forEach(id => {
                           const el = document.getElementById(id);
                           if(el) { el.addEventListener('input', updateUI); el.addEventListener('change', updateUI); }
                       });
@@ -1889,6 +2265,7 @@ function getDashboardUI(hasDB) {
                                       <input type="text" id="sync-\${p.id}" readonly value="\${p.sync}" class="w-full bg-slate-50 dark:bg-darkbg border border-slate-200 dark:border-darkborder px-4 py-3 rounded-xl text-sm outline-none font-mono text-slate-600 dark:text-slate-400 truncate pe-12">
                                       <button onclick="copyData('sync-\${p.id}')" class="absolute bottom-1 end-1 text-primary p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
                                   </div>
+                                  <!-- QR Code Button Enhanced -->
                                   <button onclick="showQR('\${p.name}', document.getElementById('sync-\${p.id}').value)" class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors text-sm">
                                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                                       Show QR Code
@@ -1898,6 +2275,7 @@ function getDashboardUI(hasDB) {
                           pCont.innerHTML += html;
                       });
                       
+                      // Inject usage metrics table
                       const usageCont = document.getElementById('usage-metrics-container');
                       if(usageCont && data.usage) {
                           usageCont.innerHTML = '';
@@ -1932,7 +2310,9 @@ function getDashboardUI(hasDB) {
                       tgToken: el('cfg-tg-token').value, tgChatId: el('cfg-tg-chat').value,
                       cfAccountId: el('cfg-cf-acc').value, cfApiToken: el('cfg-cf-token').value,
                       isPaused: el('cfg-pause').checked, silentAlerts: el('cfg-silent').checked,
-                      githubRepo: el('cfg-github-repo').value
+                      githubRepo: el('cfg-github-repo').value,
+                      nameStrategy: el('cfg-name-strategy').value,
+                      namePrefix: el('cfg-name-prefix').value
                   }
               };
               const stat = el('save-status'); stat.textContent = i18n[lang].msg_saving; stat.className = "text-sm font-bold text-primary animate-pulse md:me-4";
@@ -1969,7 +2349,9 @@ function getDashboardUI(hasDB) {
                       tgToken: el('cfg-tg-token').value, tgChatId: el('cfg-tg-chat').value,
                       cfAccountId: el('cfg-cf-acc').value, cfApiToken: el('cfg-cf-token').value,
                       isPaused: el('cfg-pause').checked, silentAlerts: el('cfg-silent').checked,
-                      githubRepo: el('cfg-github-repo').value
+                      githubRepo: el('cfg-github-repo').value,
+                      nameStrategy: el('cfg-name-strategy').value,
+                      namePrefix: el('cfg-name-prefix').value
                   }
               };
               
@@ -1997,16 +2379,14 @@ function getDashboardUI(hasDB) {
               let usage = window.nahanUsage || {};
               tbl.innerHTML = '';
               if (users.length === 0) {
-                  tbl.innerHTML = \`<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400" data-i18n="no_users">\${i18n[lang].no_users}</td></tr>\`;
+                  tbl.innerHTML = \`<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400" data-i18n="no_users">\${i18n[lang].no_users}</td></tr>\`;
                   return;
               }
               users.forEach((u, i) => {
-                  let sysU = usage[u.id.replace(/-/g,'').toLowerCase()] || {reqs: 0, dReqs: 0, lastDay: '', totalBytes: 0};
+                  let sysU = usage[u.id.replace(/-/g,'').toLowerCase()] || {reqs: 0, dReqs: 0, lastDay: ''};
                   let userReqs = sysU.reqs || 0;
                   let userDReqs = sysU.lastDay === new Date().toISOString().split('T')[0] ? (sysU.dReqs || 0) : 0;
-                  let userBytes = sysU.totalBytes || 0;
-                  let userBytesGB = (userBytes / 1024 / 1024 / 1024).toFixed(2);
-                  let limitBytesGB = u.limitBytes ? (u.limitBytes / 1024 / 1024 / 1024).toFixed(1) + ' GB' : 'Unlimited';
+                  
                   let limitTotalTxt = u.limitTotalReq ? u.limitTotalReq : 'Unlimited';
                   let limitDailyTxt = u.limitDailyReq ? u.limitDailyReq : 'Unlimited';
                   
@@ -2021,23 +2401,25 @@ function getDashboardUI(hasDB) {
                       if (Date.now() > u.expiryMs) { expTxt += ' <span class="text-xs text-red-500 font-bold">(Expired)</span>'; isExp = true; }
                   }
                   
-                  let linkHtml = \`<button onclick="copyData('sync-\${u.id}')" class="text-primary hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Copy Subscription Link">🔗</button>\`;
+                  let linkHtml = \`<button onclick="copyData('sync-\${u.id}')" class="text-primary hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Copy Subscription Link">馃敆</button>\`;
                   
-                  let pauseBtnHtml = \`<button onclick="togglePauseUser('\${u.id}')" class="\${u.isPaused ? 'text-green-500 hover:text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-800/50' : 'text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-800/50'} p-2 rounded-lg" title="\${u.isPaused ? 'Resume User' : 'Pause User'}">\${u.isPaused ? '▶️' : '⏸️'}</button>\`;
+                  let pauseBtnHtml = \`<button onclick="togglePauseUser('\${u.id}')" class="\${u.isPaused ? 'text-green-500 hover:text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-800/50' : 'text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-800/50'} p-2 rounded-lg" title="\${u.isPaused ? 'Resume User' : 'Pause User'}">\${u.isPaused ? '鈻讹笍' : '鈴革笍'}</button>\`;
+
+                  let editBtnHtml = \`<button onclick="editUser('\${u.id}')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Edit Subscriber">鉁忥笍</button>\`;
 
                   let tr = document.createElement('tr');
                   tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors";
                   tr.innerHTML = \`
-                      <td class="px-4 py-4 font-bold text-slate-700 dark:text-slate-300">\${u.name} \${u.isPaused ? '⏸️' : (isExp ? '🔴' : '🟢')}</td>
+                      <td class="px-4 py-4 font-bold text-slate-700 dark:text-slate-300">\${u.name} \${u.isPaused ? '鈴革笍' : (isExp ? '馃敶' : '馃煝')}</td>
                       <td class="px-4 py-4 font-mono text-xs text-slate-500 select-all">\${u.id}</td>
-                      <td class="px-4 py-4 text-slate-600 dark:text-slate-400 font-mono"><div class="flex flex-col"><span class="font-bold">\${userBytesGB} GB / \${limitBytesGB}</span></div></td>
                       <td class="px-4 py-4 text-slate-600 dark:text-slate-400 font-mono"><div class="flex flex-col"><span class="font-bold">Total: \${userReqs} / \${limitTotalTxt} (\${perT})</span><span class="text-xs opacity-70">Daily: \${userDReqs} / \${limitDailyTxt} (\${perD})</span></div></td>
                       <td class="px-4 py-4 text-slate-600 dark:text-slate-400">\${expTxt}</td>
                       <td class="px-4 py-4 text-end space-x-2 space-x-reverse">
                           <input type="hidden" id="sync-\${u.id}" value="\${window.nahanProfiles.find(p => p.id === u.id)?.sync || ''}">
                           \${linkHtml}
                           \${pauseBtnHtml}
-                          <button onclick="deleteUser('\${u.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-800/50 p-2 rounded-lg">🗑️</button>
+                          \${editBtnHtml}
+                          <button onclick="deleteUser('\${u.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-800/50 p-2 rounded-lg">馃棏锔�</button>
                       </td>
                   \`;
                   tbl.appendChild(tr);
@@ -2050,6 +2432,7 @@ function getDashboardUI(hasDB) {
               if(window.nahanConfig && window.nahanConfig.users) {
                   window.nahanConfig.users = window.nahanConfig.users.filter(u => u.id !== uuid);
               }
+              // Automatically sync
               renderUsersTable();
               doSaveDirectly();
           }
@@ -2070,25 +2453,23 @@ function getDashboardUI(hasDB) {
               let tReq = document.getElementById('add-user-total-reqs').value;
               let dReq = document.getElementById('add-user-daily-reqs').value;
               let days = document.getElementById('add-user-days').value;
-              let limitGB = document.getElementById('add-user-bytes').value;
               
               if(!name) { alert('Please enter a name'); return; }
               tReq = tReq ? parseInt(tReq) : null;
               dReq = dReq ? parseInt(dReq) : null;
               days = days ? parseInt(days) : null;
-              let limitBytes = limitGB ? parseInt(limitGB) * 1024 * 1024 * 1024 : null;
               
               if(!window.nahanConfig) window.nahanConfig = {};
               if(!window.nahanConfig.users) window.nahanConfig.users = [];
               
-              let newId = crypto.randomUUID();
+              let newId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                  .map((b,i) => (i===4||i===6||i===8||i===10?'-':'') + b.toString(16).padStart(2,'0')).join('');
               
               const u = {
                   id: newId,
                   name: name,
                   limitTotalReq: tReq,
                   limitDailyReq: dReq,
-                  limitBytes: limitBytes,
                   expiryMs: days ? Date.now() + days*86400000 : null,
                   createdAt: Date.now()
               };
@@ -2099,8 +2480,53 @@ function getDashboardUI(hasDB) {
               document.getElementById('add-user-total-reqs').value = '';
               document.getElementById('add-user-daily-reqs').value = '';
               document.getElementById('add-user-days').value = '';
-              document.getElementById('add-user-bytes').value = '';
               
+              renderUsersTable();
+              doSaveDirectly();
+          }
+
+          function editUser(uuid) {
+              if(!window.nahanConfig || !window.nahanConfig.users) return;
+              let u = window.nahanConfig.users.find(usr => usr.id === uuid);
+              if(!u) return;
+              
+              document.getElementById('edit-user-id').value = u.id;
+              document.getElementById('edit-user-name').value = u.name;
+              document.getElementById('edit-user-total-reqs').value = u.limitTotalReq || '';
+              document.getElementById('edit-user-daily-reqs').value = u.limitDailyReq || '';
+              
+              let daysLeft = '';
+              if(u.expiryMs) {
+                  let diff = u.expiryMs - Date.now();
+                  daysLeft = diff > 0 ? Math.ceil(diff / 86400000) : 0;
+              }
+              document.getElementById('edit-user-days').value = daysLeft;
+              
+              document.getElementById('modal-edit-user').classList.remove('hidden');
+          }
+
+          function commitEditUser() {
+              const uuid = document.getElementById('edit-user-id').value;
+              const name = document.getElementById('edit-user-name').value;
+              let tReq = document.getElementById('edit-user-total-reqs').value;
+              let dReq = document.getElementById('edit-user-daily-reqs').value;
+              let days = document.getElementById('edit-user-days').value;
+              
+              if(!name) { alert('Please enter a name'); return; }
+              tReq = tReq ? parseInt(tReq) : null;
+              dReq = dReq ? parseInt(dReq) : null;
+              days = days ? parseInt(days) : null;
+              
+              if(!window.nahanConfig || !window.nahanConfig.users) return;
+              let u = window.nahanConfig.users.find(usr => usr.id === uuid);
+              if(!u) return;
+              
+              u.name = name;
+              u.limitTotalReq = tReq;
+              u.limitDailyReq = dReq;
+              u.expiryMs = days ? Date.now() + days*86400000 : null;
+              
+              document.getElementById('modal-edit-user').classList.add('hidden');
               renderUsersTable();
               doSaveDirectly();
           }
@@ -2128,7 +2554,7 @@ function getDashboardUI(hasDB) {
               repo = repo.replace(/https:\\/\\/github\\.com\\//, '').trim();
               if (!repo) return;
               
-              try {O
+              try {
                   let remoteVer = null;
                   try {
                       const res = await fetch('https://raw.githubusercontent.com/' + repo + '/main/version');
@@ -2154,7 +2580,7 @@ function getDashboardUI(hasDB) {
                   if (remoteVer) {
                       const strip = v => v.replace(/^v/, '').trim();
                       const rVer = strip(remoteVer);
-                      const cVer = strip("2.3.2");
+                      const cVer = strip("2.3.4");
                       
                       if (rVer && rVer > cVer) {
                           showUpdateBanner(repo, rVer);
@@ -2170,7 +2596,7 @@ function getDashboardUI(hasDB) {
               if (!banner) return;
               
               const msg = lang === 'fa' 
-                  ? 'نسخه جدیدتر (v' + version + ') در مخزن گیت\u200cهاب شما (' + repo + ') در دسترس است.' 
+                  ? '賳爻禺賴 噩丿蹖丿鬲乇 (v' + version + ') 丿乇 賲禺夭賳 诏蹖鬲\u200c賴丕亘 卮賲丕 (' + repo + ') 丿乇 丿爻鬲乇爻 丕爻鬲.' 
                   : 'A newer version (v' + version + ') is available in your GitHub repository (' + repo + ').';
                   
               document.getElementById('update-alert-text').textContent = msg;
@@ -2203,4 +2629,4 @@ function getDashboardUI(hasDB) {
   </body>
   </html>
     `;
-  }
+  } 
