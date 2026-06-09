@@ -1,7 +1,7 @@
 import { connect } from "cloudflare:sockets";
 
 /* 
- * Project Nahan (賳賴丕賳) - IoT Device Telemetry Gateway
+ * Project Nahan (نهان) - IoT Device Telemetry Gateway
  * Handles real-time binary streams from remote sensor nodes.
  */
 
@@ -299,7 +299,7 @@ async function fetchCloudflareUsage(accountId, apiToken) {
 async function sendTelegramMessage(request, type) {
     if (!sysConfig.tgToken || !sysConfig.tgChatId) return;
 
-    let usageStr = "賳丕賲卮禺氐 (0.00%)";
+    let usageStr = "نامشخص (0.00%)";
     if (sysConfig.cfAccountId && sysConfig.cfApiToken) {
         const reqs = await fetchCloudflareUsage(sysConfig.cfAccountId, sysConfig.cfApiToken);
         if (reqs !== null) {
@@ -317,7 +317,7 @@ async function sendTelegramMessage(request, type) {
     const asOrg = cf.asOrganization || "Unknown";
     const domain = request.headers.get("Host") || new URL(request.url).hostname;
     const path = new URL(request.url).pathname;
-    const ua = request.headers.get("User-Agent") || "丨丕賱丕 蹖賵夭乇丕蹖噩賳鬲 賲丕乇賵 賳亘蹖賳蹖賳";
+    const ua = request.headers.get("User-Agent") || "حالا یوزرایجنت مارو نبینین";
 
     const d = new Date();
     const timeStr = new Intl.DateTimeFormat('fa-IR', { 
@@ -325,15 +325,15 @@ async function sendTelegramMessage(request, type) {
         hour: '2-digit', minute: '2-digit', second: '2-digit' 
     }).format(d);
 
-    const text = `馃搶 賳賵毓: ${type}\n` +
-                 `馃寪 IP: ${ip}\n` +
-                 `馃搷 賲賵賯毓蹖鬲: ${country} ${city}\n` +
-                 `馃彚 ASN: AS${asn} ${asOrg}\n` +
-                 `馃敆 丿丕賲賳賴: ${domain}\n` +
-                 `馃攳 賲爻蹖乇: ${path}\n` +
-                 `馃 賲乇賵乇诏乇: ${ua}\n` +
-                 `馃搮 夭賲丕賳: ${timeStr}\n` +
-                 `馃搳 賲氐乇賮: ${usageStr}`;
+    const text = `📌 نوع: ${type}\n` +
+                 `🌐 IP: ${ip}\n` +
+                 `📍 موقعیت: ${country} ${city}\n` +
+                 `🏢 ASN: AS${asn} ${asOrg}\n` +
+                 `🔗 دامنه: ${domain}\n` +
+                 `🔍 مسیر: ${path}\n` +
+                 `🤖 مرورگر: ${ua}\n` +
+                 `📅 زمان: ${timeStr}\n` +
+                 `📊 مصرف: ${usageStr}`;
 
     const panelUrl = `https://${domain}/${encodeURI(sysConfig.apiRoute)}/dash`;
 
@@ -348,10 +348,10 @@ async function sendTelegramMessage(request, type) {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: "賵乇賵丿 亘賴 倬賳賱 馃攼", web_app: { url: panelUrl } }],
+                        [{ text: "ورود به پنل 🔐", web_app: { url: panelUrl } }],
                         [
-                            { text: "丿乇蹖丕賮鬲 爻丕亘 馃敆", callback_data: "get_sub" },
-                            { text: "亘乇賵夭乇爻丕賳蹖 賲氐乇賮 馃搳", callback_data: "get_usage" }
+                            { text: "دریافت ساب 🔗", callback_data: "get_sub" },
+                            { text: "بروزرسانی مصرف 📊", callback_data: "get_usage" }
                         ]
                     ]
                 }
@@ -395,7 +395,7 @@ async function handleAuth(request, hostName, ctx, env) {
         const ip = request.headers.get("cf-connecting-ip") || "Unknown";
         if (data.key === sysConfig.masterKey) {
             ctx?.waitUntil(logActivity(env, "Auth Success", `Successful panel login from ${ip}`));
-            if (!sysConfig.silentAlerts && ctx) ctx.waitUntil(sendTelegramMessage(request, "賵乇賵丿 亘賴 倬賳賱 (賲賵賮賯)"));
+            if (!sysConfig.silentAlerts && ctx) ctx.waitUntil(sendTelegramMessage(request, "ورود به پنل (موفق)"));
             const netInfo = {
                 ip: ip,
                 colo: request.cf?.colo || "Unknown",
@@ -414,7 +414,7 @@ async function handleAuth(request, hostName, ctx, env) {
             }), { status: 200 });
         }
         ctx?.waitUntil(logActivity(env, "Auth Failed", `Failed login attempt from ${ip}`));
-        if (ctx) ctx.waitUntil(sendTelegramMessage(request, "鬲賱丕卮 賳丕賲賵賮賯 賵乇賵丿 亘賴 倬賳賱!"));
+        if (ctx) ctx.waitUntil(sendTelegramMessage(request, "تلاش ناموفق ورود به پنل!"));
         return new Response(JSON.stringify({ success: false }), { status: 401 });
     } catch (e) { return new Response(JSON.stringify({ success: false }), { status: 400 }); }
 }
@@ -462,19 +462,19 @@ async function handleConfigSync(request, env, ctx) {
 
 const botI18n = {
     en: {
-        welcome: "馃 **Welcome to Nahan Gateway Bot**\nSelect your option below to manage your system:",
-        status: "馃搳 System Status",
-        users: "馃懃 Subscribers",
-        metrics: "馃摗 Gateway Health",
-        panic: "馃毃 Panic Mode",
-        dash: "馃攽 Dashboard Control",
-        lang: "馃寪 Change Language",
-        active: "馃煝 Active",
-        paused: "馃敶 Paused",
-        uptime: "鈴� Uptime",
-        streams: "馃摗 Active Streams",
+        welcome: "🤖 **Welcome to Nahan Gateway Bot**\nSelect your option below to manage your system:",
+        status: "📊 System Status",
+        users: "👥 Subscribers",
+        metrics: "📡 Gateway Health",
+        panic: "🚨 Panic Mode",
+        dash: "🔑 Dashboard Control",
+        lang: "🌐 Change Language",
+        active: "🟢 Active",
+        paused: "🔴 Paused",
+        uptime: "⏱ Uptime",
+        streams: "📡 Active Streams",
         no_users: "No subscribers found.",
-        sub_info: "馃懁 Subscriber Details:",
+        sub_info: "👤 Subscriber Details:",
         name: "Name",
         total: "Total Reqs",
         daily: "Daily Reqs",
@@ -482,66 +482,66 @@ const botI18n = {
         days: "Days remaining",
         created: "Created At",
         unlimited: "Unlimited",
-        btn_back: "鈼€锔� Back",
-        btn_next: "鈻讹笍 Next",
-        btn_del: "馃棏锔� Delete",
-        btn_pause: "鈴革笍 Pause",
-        btn_resume: "鈻讹笍 Resume",
-        btn_edit_name: "鉁忥笍 Change Name",
-        btn_edit_limits: "鈿欙笍 Limits",
+        btn_back: "◀️ Back",
+        btn_next: "▶️ Next",
+        btn_del: "🗑️ Delete",
+        btn_pause: "⏸️ Pause",
+        btn_resume: "▶️ Resume",
+        btn_edit_name: "✏️ Change Name",
+        btn_edit_limits: "⚙️ Limits",
         btn_add: "+ Add Subscriber",
-        btn_confirm: "鉁� Confirm",
-        btn_cancel: "鉂� Cancel",
+        btn_confirm: "✅ Confirm",
+        btn_cancel: "❌ Cancel",
         msg_enter_name: "Please send a name for the subscriber:",
-        msg_added: "Sub added successfully! 馃帀",
-        msg_deleted: "Sub deleted successfully! 馃棏锔�",
-        msg_panic: "馃毃 PANIC MODE ACTIVATED 馃毃\nRoute randomized & System Paused.",
+        msg_added: "Sub added successfully! 🎉",
+        msg_deleted: "Sub deleted successfully! 🗑️",
+        msg_panic: "🚨 PANIC MODE ACTIVATED 🚨\nRoute randomized & System Paused.",
         msg_invalid: "Invalid input. Please try again.",
         msg_enter_limits: "Enter limits format:\n`[totalReqs] [dailyReqs] [days_limit]`\n(Use 0 for unlimited)\n\nExample:\n`10000 500 30`",
-        msg_confirm_del: "鈿狅笍 Are you sure you want to delete this subscriber?",
-        msg_confirm_panic: "鈿狅笍 Are you absolutely sure you want to trigger PANIC mode? This will randomize API routes and pause all connections!",
-        status_updated: "Status updated! 馃攣"
+        msg_confirm_del: "⚠️ Are you sure you want to delete this subscriber?",
+        msg_confirm_panic: "⚠️ Are you absolutely sure you want to trigger PANIC mode? This will randomize API routes and pause all connections!",
+        status_updated: "Status updated! 🔁"
     },
     fa: {
-        welcome: "馃 **亘賴 乇亘丕鬲 鬲乇丕賳夭蹖鬲 賳賴丕賳 禺賵卮 丌賲丿蹖丿**\n噩賴鬲 賲丿蹖乇蹖鬲 爻蹖爻鬲賲 賳馗丕乇鬲蹖 禺賵丿 蹖讴蹖 丕夭 诏夭蹖賳賴鈥屬囏й� 夭蹖乇 乇丕 丕賳鬲禺丕亘 賳賲丕蹖蹖丿:",
-        status: "馃搳 賵囟毓蹖鬲 爻蹖爻鬲賲",
-        users: "馃懃 賲丿蹖乇蹖鬲 賲卮鬲乇讴蹖賳",
-        metrics: "馃摗 爻賱丕賲鬲 丿乇诏丕賴 卮亘讴賴",
-        panic: "馃毃 賵囟毓蹖鬲 丕囟胤乇丕乇蹖 (Panic)",
-        dash: "馃攽 倬賳賱 鬲丨鬲 賵亘",
-        lang: "馃寪 鬲睾蹖蹖乇 夭亘丕賳 亘賴 丕賳诏賱蹖爻蹖",
-        active: "馃煝 賮毓丕賱",
-        paused: "馃敶 賲鬲賵賯賮 卮丿賴",
-        uptime: "鈴� 賲丿鬲 夭賲丕賳 讴丕乇讴乇丿",
-        streams: "馃摗 丕鬲氐丕賱丕鬲 賮毓丕賱",
-        no_users: "賴蹖趩 賲卮鬲乇讴蹖 倬蹖丿丕 賳卮丿.",
-        sub_info: "馃懁 賲卮禺氐丕鬲 賲卮鬲乇讴:",
-        name: "賳丕賲",
-        total: "丿乇禺賵丕爻鬲 讴賱",
-        daily: "丿乇禺賵丕爻鬲 乇賵夭丕賳賴",
-        expiry: "丕賳賯囟丕亍",
-        days: "乇賵夭賴丕蹖 亘丕賯蹖鈥屬呚з嗀�",
-        created: "鬲丕乇蹖禺 丕蹖噩丕丿",
-        unlimited: "賳丕賲丨丿賵丿",
-        btn_back: "鈼€锔� 亘丕夭诏卮鬲",
-        btn_next: "鈻讹笍 亘毓丿蹖",
-        btn_del: "馃棏锔� 丨匕賮",
-        btn_pause: "鈴革笍 睾蹖乇賮毓丕賱鈥屫池ж槽�",
-        btn_resume: "鈻讹笍 賮毓丕賱鈥屫池ж槽�",
-        btn_edit_name: "鉁忥笍 鬲睾蹖蹖乇 賳丕賲",
-        btn_edit_limits: "鈿欙笍 賵蹖乇丕蹖卮 賲丨丿賵丿蹖鬲鈥屬囏�",
-        btn_add: "+ 丕賮夭賵丿賳 賲卮鬲乇讴 噩丿蹖丿",
-        btn_confirm: "鉁� 鬲兀蹖蹖丿",
-        btn_cancel: "鉂� 丕賳氐乇丕賮",
-        msg_enter_name: "賱胤賮丕賸 賳丕賲 蹖丕 卮賳丕爻賴 賲卮鬲乇讴 噩丿蹖丿 乇丕 丕乇爻丕賱 賳賲丕蹖蹖丿:",
-        msg_added: "賲卮鬲乇讴 亘丕 賲賵賮賯蹖鬲 丕賮夭賵丿賴 卮丿! 馃帀",
-        msg_deleted: "賲卮鬲乇讴 亘丕 賲賵賮賯蹖鬲 丨匕賮 诏乇丿蹖丿! 馃棏锔�",
-        msg_panic: "馃毃 賵囟毓蹖鬲 丕囟胤乇丕乇蹖 賮毓丕賱 卮丿 馃毃\n賲爻蹖乇 鬲氐丕丿賮蹖 卮丿 賵 爻蹖爻鬲賲 賲鬲賵賯賮 诏乇丿蹖丿.",
-        msg_invalid: "賵乇賵丿蹖 賳丕賲毓鬲亘乇 丕爻鬲. 賲噩丿丿丕賸 鬲賱丕卮 賳賲丕蹖蹖丿.",
-        msg_enter_limits: "賮乇賲鬲 賵乇賵丿蹖 賲丨丿賵丿蹖鬲:\n`[讴賱] [乇賵夭丕賳賴] [賲丿鬲_乇賵夭]`\n(丕夭 0 亘乇丕蹖 賳丕賲丨丿賵丿 丕爻鬲賮丕丿賴 讴賳蹖丿)\n\n賲孬丕賱:\n`10000 500 30`",
-        msg_confirm_del: "鈿狅笍 丌蹖丕 丕夭 丨匕賮 丕蹖賳 賲卮鬲乇讴 丕胤賲蹖賳丕賳 讴丕賲賱 丿丕乇蹖丿責",
-        msg_confirm_panic: "鈿狅笍 丌蹖丕 丕夭 賮毓丕賱鈥屫池ж槽� 賵囟毓蹖鬲 丕囟胤乇丕乇蹖 丕胤賲蹖賳丕賳 丿丕乇蹖丿責 讴賱 丕鬲氐丕賱丕鬲 賲鬲賵賯賮 賵 丌丿乇爻鈥屬囏� 賲賳賯囟蹖 禺賵丕賴賳丿 卮丿!",
-        status_updated: "賵囟毓蹖鬲 亘乇賵夭乇爻丕賳蹖 卮丿! 馃攣"
+        welcome: "🤖 **به ربات ترانزیت نهان خوش آمدید**\nجهت مدیریت سیستم نظارتی خود یکی از گزینه‌های زیر را انتخاب نمایید:",
+        status: "📊 وضعیت سیستم",
+        users: "👥 مدیریت مشترکین",
+        metrics: "📡 سلامت درگاه شبکه",
+        panic: "🚨 وضعیت اضطراری (Panic)",
+        dash: "🔑 پنل تحت وب",
+        lang: "🌐 تغییر زبان به انگلیسی",
+        active: "🟢 فعال",
+        paused: "🔴 متوقف شده",
+        uptime: "⏱ مدت زمان کارکرد",
+        streams: "📡 اتصالات فعال",
+        no_users: "هیچ مشترکی پیدا نشد.",
+        sub_info: "👤 مشخصات مشترک:",
+        name: "نام",
+        total: "درخواست کل",
+        daily: "درخواست روزانه",
+        expiry: "انقضاء",
+        days: "روزهای باقی‌مانده",
+        created: "تاریخ ایجاد",
+        unlimited: "نامحدود",
+        btn_back: "◀️ بازگشت",
+        btn_next: "▶️ بعدی",
+        btn_del: "🗑️ حذف",
+        btn_pause: "⏸️ غیرفعال‌سازی",
+        btn_resume: "▶️ فعال‌سازی",
+        btn_edit_name: "✏️ تغییر نام",
+        btn_edit_limits: "⚙️ ویرایش محدودیت‌ها",
+        btn_add: "+ افزودن مشترک جدید",
+        btn_confirm: "✅ تأیید",
+        btn_cancel: "❌ انصراف",
+        msg_enter_name: "لطفاً نام یا شناسه مشترک جدید را ارسال نمایید:",
+        msg_added: "مشترک با موفقیت افزوده شد! 🎉",
+        msg_deleted: "مشترک با موفقیت حذف گردید! 🗑️",
+        msg_panic: "🚨 وضعیت اضطراری فعال شد 🚨\nمسیر تصادفی شد و سیستم متوقف گردید.",
+        msg_invalid: "ورودی نامعتبر است. مجدداً تلاش نمایید.",
+        msg_enter_limits: "فرمت ورودی محدودیت:\n`[کل] [روزانه] [مدت_روز]`\n(از 0 برای نامحدود استفاده کنید)\n\nمثال:\n`10000 500 30`",
+        msg_confirm_del: "⚠️ آیا از حذف این مشترک اطمینان کامل دارید؟",
+        msg_confirm_panic: "⚠️ آیا از فعال‌سازی وضعیت اضطراری اطمینان دارید؟ کل اتصالات متوقف و آدرس‌ها منقضی خواهند شد!",
+        status_updated: "وضعیت بروزرسانی شد! 🔁"
     }
 };
 
@@ -592,28 +592,28 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
 
         const getMainMenu = () => {
             const isPaused = sysConfig.isPaused || false;
-            const statusEmoji = isPaused ? "馃敶" : "馃煝";
+            const statusEmoji = isPaused ? "🔴" : "🟢";
             const text = `${t("welcome")}\n\n` +
-                         `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n` +
-                         `鈿� **${t("status")}**: ${isPaused ? t("paused") : t("active")} ${statusEmoji}\n` +
-                         `馃懃 **${t("users")}**: ${sysConfig.users?.length || 0}\n` +
-                         `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣`;
+                         `━━━━━━━━━━━━━━━━\n` +
+                         `⚡ **${t("status")}**: ${isPaused ? t("paused") : t("active")} ${statusEmoji}\n` +
+                         `👥 **${t("users")}**: ${sysConfig.users?.length || 0}\n` +
+                         `━━━━━━━━━━━━━━━━`;
             const panelUrl = `https://${hostName}/${encodeURI(sysConfig.apiRoute)}/dash`;
             const kb = {
                 inline_keyboard: [
                     [
-                        { text: `馃寪 ${langCode === 'fa' ? 'English 馃嚭馃嚫' : '賮丕乇爻蹖 馃嚠馃嚪'}`, callback_data: "sys_lang" },
-                        { text: isPaused ? "鈻讹笍 Resume" : "鈴革笍 Pause", callback_data: "sys_toggle_status" }
+                        { text: `🌐 ${langCode === 'fa' ? 'English 🇺🇸' : 'فارسی 🇮🇷'}`, callback_data: "sys_lang" },
+                        { text: isPaused ? "▶️ Resume" : "⏸️ Pause", callback_data: "sys_toggle_status" }
                     ],
                     [
-                        { text: `馃懃 ${t("users")}`, callback_data: "subs_list:0" },
-                        { text: `馃摗 ${t("metrics")}`, callback_data: "sys_metrics" }
+                        { text: `👥 ${t("users")}`, callback_data: "subs_list:0" },
+                        { text: `📡 ${t("metrics")}`, callback_data: "sys_metrics" }
                     ],
                     [
-                        { text: `馃攽 ${t("dash")}`, web_app: { url: panelUrl } }
+                        { text: `🔑 ${t("dash")}`, web_app: { url: panelUrl } }
                     ],
                     [
-                        { text: `馃毃 ${t("panic")}`, callback_data: "sys_panic_init" }
+                        { text: `🚨 ${t("panic")}`, callback_data: "sys_panic_init" }
                     ]
                 ]
             };
@@ -628,36 +628,36 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
             const end = start + itemsPerPage;
             const pageUsers = users.slice(start, end);
             
-            let text = `馃懃 **${t("users")}** (Page ${page + 1}/${Math.max(1, totalPages)})\n`;
-            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
+            let text = `👥 **${t("users")}** (Page ${page + 1}/${Math.max(1, totalPages)})\n`;
+            text += `━━━━━━━━━━━━━━━━\n`;
             
             if (users.length === 0) {
-                text += `鈿狅笍 ${t("no_users")}\n`;
+                text += `⚠️ ${t("no_users")}\n`;
             } else {
                 pageUsers.forEach((u, idx) => {
-                    text += `${start + idx + 1}. 馃懁 **${u.name}**\n   <code>${u.id}</code>\n`;
+                    text += `${start + idx + 1}. 👤 **${u.name}**\n   <code>${u.id}</code>\n`;
                 });
             }
-            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣`;
+            text += `━━━━━━━━━━━━━━━━`;
             
             const inline_keyboard = [];
             pageUsers.forEach((u) => {
-                inline_keyboard.push([{ text: `馃懁 ${u.name}`, callback_data: `sub_detail:${u.id}` }]);
+                inline_keyboard.push([{ text: `👤 ${u.name}`, callback_data: `sub_detail:${u.id}` }]);
             });
             
             const navRow = [];
             if (page > 0) {
-                navRow.push({ text: `猬咃笍 ${t("btn_back")}`, callback_data: `subs_list:${page - 1}` });
+                navRow.push({ text: `⬅️ ${t("btn_back")}`, callback_data: `subs_list:${page - 1}` });
             }
             if (end < users.length) {
-                navRow.push({ text: `${t("btn_next")} 鉃★笍`, callback_data: `subs_list:${page + 1}` });
+                navRow.push({ text: `${t("btn_next")} ➡️`, callback_data: `subs_list:${page + 1}` });
             }
             if (navRow.length > 0) {
                 inline_keyboard.push(navRow);
             }
             
-            inline_keyboard.push([{ text: `鉃� ${t("btn_add")}`, callback_data: "sub_add_init" }]);
-            inline_keyboard.push([{ text: "馃敊 Main Menu", callback_data: "main_menu" }]);
+            inline_keyboard.push([{ text: `➕ ${t("btn_add")}`, callback_data: "sub_add_init" }]);
+            inline_keyboard.push([{ text: "🔙 Main Menu", callback_data: "main_menu" }]);
             
             return { text, kb: { inline_keyboard } };
         };
@@ -666,7 +666,7 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
             const users = sysConfig.users || [];
             const u = users.find(usr => usr.id === uuid);
             if (!u) {
-                return { text: "鈿狅笍 User not found", kb: { inline_keyboard: [[{ text: "Back", callback_data: "subs_list:0" }]] } };
+                return { text: "⚠️ User not found", kb: { inline_keyboard: [[{ text: "Back", callback_data: "subs_list:0" }]] } };
             }
             
             const sysU = sysUsageCache?.users?.[u.id.replace(/-/g,'').toLowerCase()] || { reqs: 0, dReqs: 0, lastDay: '' };
@@ -683,38 +683,38 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                 const date = new Date(u.expiryMs);
                 expTxt = date.toLocaleDateString();
                 if (Date.now() > u.expiryMs) {
-                    expTxt += ` (${langCode === 'fa' ? '賲賳賯囟蹖 卮丿賴 馃敶' : 'Expired 馃敶'})`;
+                    expTxt += ` (${langCode === 'fa' ? 'منقضی شده 🔴' : 'Expired 🔴'})`;
                     isExp = true;
                 }
             }
             
-            const statusEmoji = u.isPaused ? "鈴革笍" : (isExp ? "馃敶" : "馃煝");
-            const statusText = u.isPaused ? t("paused") : (isExp ? (langCode==='fa'?'賲賳賯囟蹖':'Expired') : t("active"));
+            const statusEmoji = u.isPaused ? "⏸️" : (isExp ? "🔴" : "🟢");
+            const statusText = u.isPaused ? t("paused") : (isExp ? (langCode==='fa'?'منقضی':'Expired') : t("active"));
             const subSync = `https://${hostName}/${sysConfig.apiRoute}?sub=${encodeURIComponent(u.name)}`;
             
-            let text = `馃懁 **${t("sub_info")}**\n`;
-            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
-            text += `馃摏 **${t("name")}**: ${u.name}\n`;
-            text += `馃啍 **UUID**: <code>${u.id}</code>\n`;
-            text += `馃殾 **Status**: ${statusEmoji} ${statusText}\n`;
-            text += `馃搳 **${t("total")}**: ${userReqs} / ${limitTotalTxt}\n`;
-            text += `鈴� **${t("daily")}**: ${userDReqs} / ${limitDailyTxt}\n`;
-            text += `馃搮 **${t("expiry")}**: ${expTxt}\n`;
-            text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
-            text += `馃敆 **Subscription Connection:**\n<code>${subSync}</code>`;
+            let text = `👤 **${t("sub_info")}**\n`;
+            text += `━━━━━━━━━━━━━━━━\n`;
+            text += `📛 **${t("name")}**: ${u.name}\n`;
+            text += `🆔 **UUID**: <code>${u.id}</code>\n`;
+            text += `🚦 **Status**: ${statusEmoji} ${statusText}\n`;
+            text += `📊 **${t("total")}**: ${userReqs} / ${limitTotalTxt}\n`;
+            text += `⏱ **${t("daily")}**: ${userDReqs} / ${limitDailyTxt}\n`;
+            text += `📅 **${t("expiry")}**: ${expTxt}\n`;
+            text += `━━━━━━━━━━━━━━━━\n`;
+            text += `🔗 **Subscription Connection:**\n<code>${subSync}</code>`;
             
             const kb = {
                 inline_keyboard: [
                     [
-                        { text: u.isPaused ? `鈻讹笍 ${t("btn_resume")}` : `鈴革笍 ${t("btn_pause")}`, callback_data: `sub_toggle:${u.id}` },
-                        { text: `馃棏锔� ${t("btn_del")}`, callback_data: `sub_del_init:${u.id}` }
+                        { text: u.isPaused ? `▶️ ${t("btn_resume")}` : `⏸️ ${t("btn_pause")}`, callback_data: `sub_toggle:${u.id}` },
+                        { text: `🗑️ ${t("btn_del")}`, callback_data: `sub_del_init:${u.id}` }
                     ],
                     [
-                        { text: `鉁忥笍 ${t("btn_edit_name")}`, callback_data: `sub_edit_name_init:${u.id}` },
-                        { text: `鈿欙笍 ${t("btn_edit_limits")}`, callback_data: `sub_edit_limits_init:${u.id}` }
+                        { text: `✏️ ${t("btn_edit_name")}`, callback_data: `sub_edit_name_init:${u.id}` },
+                        { text: `⚙️ ${t("btn_edit_limits")}`, callback_data: `sub_edit_limits_init:${u.id}` }
                     ],
                     [
-                        { text: "馃敊 Back to List", callback_data: "subs_list:0" }
+                        { text: "🔙 Back to List", callback_data: "subs_list:0" }
                     ]
                 ]
             };
@@ -758,14 +758,14 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                     const dh = Math.floor(upSeconds/3600);
                     const dm = Math.floor((upSeconds%3600)/60);
                     
-                    let text = `馃摗 **${t("metrics")}**\n`;
-                    text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣\n`;
-                    text += `鈴� **${t("uptime")}**: ${dh}h ${dm}m\n`;
-                    text += `馃攲 **${t("streams")}**: ${activeConnections}\n`;
-                    text += `馃搳 **Cloudflare API Usage**: ${usageStr}\n`;
-                    text += `鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣`;
+                    let text = `📡 **${t("metrics")}**\n`;
+                    text += `━━━━━━━━━━━━━━━━\n`;
+                    text += `⏱ **${t("uptime")}**: ${dh}h ${dm}m\n`;
+                    text += `🔌 **${t("streams")}**: ${activeConnections}\n`;
+                    text += `📊 **Cloudflare API Usage**: ${usageStr}\n`;
+                    text += `━━━━━━━━━━━━━━━━`;
                     
-                    const kb = { inline_keyboard: [[{ text: `馃敊 Main Menu`, callback_data: "main_menu" }]] };
+                    const kb = { inline_keyboard: [[{ text: `🔙 Main Menu`, callback_data: "main_menu" }]] };
                     await sendOrEdit(chatId, text, kb, messageId);
                 } else if (data.startsWith("subs_list:")) {
                     const page = parseInt(data.replace("subs_list:", "")) || 0;
@@ -790,12 +790,12 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                     const uuid = data.replace("sub_del_init:", "");
                     const u = sysConfig.users?.find(usr => usr.id === uuid);
                     const name = u ? u.name : "";
-                    const text = `${t("msg_confirm_del")}\n\n馃懁 **${name}**`;
+                    const text = `${t("msg_confirm_del")}\n\n👤 **${name}**`;
                     const kb = {
                         inline_keyboard: [
                             [
-                                { text: `鉁� ${t("btn_confirm")}`, callback_data: `sub_del_confirm:${uuid}` },
-                                { text: `鉂� ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }
+                                { text: `✅ ${t("btn_confirm")}`, callback_data: `sub_del_confirm:${uuid}` },
+                                { text: `❌ ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }
                             ]
                         ]
                     };
@@ -806,31 +806,31 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                         sysConfig.users = sysConfig.users.filter(usr => usr.id !== uuid);
                         await d1Put(env, "sys_config", JSON.stringify(sysConfig));
                     }
-                    const successText = `鉁� ${t("msg_deleted")}`;
+                    const successText = `✅ ${t("msg_deleted")}`;
                     const kb = { inline_keyboard: [[{ text: t("btn_back"), callback_data: "subs_list:0" }]] };
                     await sendOrEdit(chatId, successText, kb, messageId);
                 } else if (data === "sub_add_init") {
                     tgState[chatId] = { step: "sub_add_name" };
                     await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
-                    const text = `鉃� ${t("msg_enter_name")}`;
-                    const kb = { inline_keyboard: [[{ text: `鉂� ${t("btn_cancel")}`, callback_data: "subs_list:0" }]] };
+                    const text = `➕ ${t("msg_enter_name")}`;
+                    const kb = { inline_keyboard: [[{ text: `❌ ${t("btn_cancel")}`, callback_data: "subs_list:0" }]] };
                     await sendOrEdit(chatId, text, kb, messageId);
                 } else if (data.startsWith("sub_edit_name_init:")) {
                     const uuid = data.replace("sub_edit_name_init:", "");
                     tgState[chatId] = { step: `sub_edit_name:${uuid}` };
                     await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
-                    const text = `鉁忥笍 ${t("msg_enter_name")}`;
-                    const kb = { inline_keyboard: [[{ text: `鉂� ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }]] };
+                    const text = `✏️ ${t("msg_enter_name")}`;
+                    const kb = { inline_keyboard: [[{ text: `❌ ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }]] };
                     await sendOrEdit(chatId, text, kb, messageId);
                 } else if (data.startsWith("sub_edit_limits_init:")) {
                     const uuid = data.replace("sub_edit_limits_init:", "");
                     tgState[chatId] = { step: `sub_edit_limits:${uuid}` };
                     await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
-                    const text = `鈿欙笍 ${t("msg_enter_limits")}`;
+                    const text = `⚙️ ${t("msg_enter_limits")}`;
                     const kb = {
                         inline_keyboard: [
-                            [{ text: `鈾撅笍 Skip (Unlimited)`, callback_data: `sub_unlimit_cb:${uuid}` }],
-                            [{ text: `鉂� ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }]
+                            [{ text: `♾️ Skip (Unlimited)`, callback_data: `sub_unlimit_cb:${uuid}` }],
+                            [{ text: `❌ ${t("btn_cancel")}`, callback_data: `sub_detail:${uuid}` }]
                         ]
                     };
                     await sendOrEdit(chatId, text, kb, messageId);
@@ -874,7 +874,7 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                     await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
                     await d1Put(env, "sys_config", JSON.stringify(sysConfig));
                     
-                    const successText = `鉁� ${t("msg_added")}`;
+                    const successText = `✅ ${t("msg_added")}`;
                     const detail = getSubDetail(newUuid);
                     await sendOrEdit(chatId, `${successText}\n\n${detail.text}`, detail.kb, messageId);
                 } else if (data === "sys_panic_init") {
@@ -882,8 +882,8 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                     const kb = {
                         inline_keyboard: [
                             [
-                                { text: `馃毃 YES PANIC 馃毃`, callback_data: "sys_panic_confirm" },
-                                { text: `鉂� No, Cancel`, callback_data: "main_menu" }
+                                { text: `🚨 YES PANIC 🚨`, callback_data: "sys_panic_confirm" },
+                                { text: `❌ No, Cancel`, callback_data: "main_menu" }
                             ]
                         ]
                     };
@@ -892,8 +892,8 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                     sysConfig.apiRoute = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2,'0')).join('');
                     sysConfig.isPaused = true;
                     await d1Put(env, "sys_config", JSON.stringify(sysConfig));
-                    const successText = `${t("msg_panic")}\n\n馃攽 New Secret Path Randomized. All old sessions revoked.`;
-                    const kb = { inline_keyboard: [[{ text: `馃敊 Main Menu`, callback_data: "main_menu" }]] };
+                    const successText = `${t("msg_panic")}\n\n🔑 New Secret Path Randomized. All old sessions revoked.`;
+                    const kb = { inline_keyboard: [[{ text: `🔙 Main Menu`, callback_data: "main_menu" }]] };
                     await sendOrEdit(chatId, successText, kb, messageId);
                 }
                 
@@ -916,11 +916,11 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                         tgState[chatId] = { step: "sub_add_limits", name: name };
                         await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
                         
-                        const msg = `鈿欙笍 **${name}**\n\n${t("msg_enter_limits")}`;
+                        const msg = `⚙️ **${name}**\n\n${t("msg_enter_limits")}`;
                         const kb = {
                             inline_keyboard: [
-                                [{ text: `鈾撅笍 Skip (Unlimited)`, callback_data: "sub_add_unlimited_skip" }],
-                                [{ text: `鉂� ${t("btn_cancel")}`, callback_data: "main_menu" }]
+                                [{ text: `♾️ Skip (Unlimited)`, callback_data: "sub_add_unlimited_skip" }],
+                                [{ text: `❌ ${t("btn_cancel")}`, callback_data: "main_menu" }]
                             ]
                         };
                         await sendOrEdit(chatId, msg, kb);
@@ -955,7 +955,7 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                         await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
                         await d1Put(env, "sys_config", JSON.stringify(sysConfig));
                         
-                        const successText = `鉁� ${t("msg_added")}`;
+                        const successText = `✅ ${t("msg_added")}`;
                         const detail = getSubDetail(newUuid);
                         await sendOrEdit(chatId, `${successText}\n\n${detail.text}`, detail.kb);
                         return new Response("OK", { status: 200 });
@@ -974,7 +974,7 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                         await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
                         
                         const detail = getSubDetail(uuid);
-                        await sendOrEdit(chatId, `鉁� Successfully Changed!`, detail.kb);
+                        await sendOrEdit(chatId, `✅ Successfully Changed!`, detail.kb);
                         return new Response("OK", { status: 200 });
                     }
                     
@@ -1002,7 +1002,7 @@ async function handleTelegramWebhook(request, env, hostName, ctx) {
                         await d1Put(env, "tg_bot_state", JSON.stringify(tgState));
                         
                         const detail = getSubDetail(uuid);
-                        await sendOrEdit(chatId, `鉁� Limits Updated!`, detail.kb);
+                        await sendOrEdit(chatId, `✅ Limits Updated!`, detail.kb);
                         return new Response("OK", { status: 200 });
                     }
                 }
@@ -1355,7 +1355,7 @@ function getDashboardUI(hasDB) {
               ${!hasDB ? `<div class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm border border-red-100 dark:border-red-900/30"><span data-i18n="missing_db">DB namespace missing!</span></div>` : ''}
               <div class="relative mb-6">
                   <input type="password" id="pwd" data-i18n="pass_ph" placeholder="Master Key" class="w-full px-5 py-4 rounded-xl border-2 border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-darkbg focus:border-primary outline-none text-center tracking-widest pe-12">
-                  <button type="button" onclick="const n=document.getElementById('pwd');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
+                  <button type="button" onclick="const n=document.getElementById('pwd');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
               </div>
               <button onclick="doLogin()" class="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:opacity-90" data-i18n="login_btn">Authenticate</button>
               <p id="err-msg" class="text-red-500 text-sm mt-4 hidden text-center font-bold" data-i18n="err_pass">Invalid Key</p>
@@ -1432,7 +1432,7 @@ function getDashboardUI(hasDB) {
                           <div class="flex gap-2 w-full sm:w-auto shrink-0 justify-end">
                               <button onclick="dismissUpdate()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-colors" data-i18n="btn_cancel">Cancel</button>
                               <a id="update-alert-btn" href="https://github.com/itsyebekhe/nahan" target="_blank" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5" data-i18n="update_btn">
-                                  Get Latest Code 鉃�
+                                  Get Latest Code ➜
                               </a>
                           </div>
                       </div>
@@ -1475,7 +1475,7 @@ function getDashboardUI(hasDB) {
                                           <p class="text-xs text-slate-500" data-i18n="ping_test_desc">Test response time to your active node target.</p>
                                       </div>
                                       <button onclick="runPingTest()" class="px-6 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-colors text-sm" data-i18n="run_diagnostics">
-                                          鈿� Run Diagnostics
+                                          ⚡ Run Diagnostics
                                       </button>
                                   </div>
                                   <div id="ping-results" class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 hidden">
@@ -1544,7 +1544,7 @@ function getDashboardUI(hasDB) {
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_pass">Master Key</label>
                                   <div class="relative">
                                       <input type="password" id="cfg-pass" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none pe-12">
-                                      <button type="button" onclick="const n=document.getElementById('cfg-pass');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
+                                      <button type="button" onclick="const n=document.getElementById('cfg-pass');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
                                   </div>
                               </div>
                               <div class="space-y-1 md:col-span-2 font-mono">
@@ -1557,10 +1557,10 @@ function getDashboardUI(hasDB) {
                                   <h3 class="text-sm uppercase font-bold text-slate-400 tracking-wider" data-i18n="backup_restore_title">Backup & Restore</h3>
                                   <div class="flex flex-col sm:flex-row gap-4">
                                       <button onclick="exportConfig()" class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors text-sm" data-i18n="export_btn">
-                                          馃摜 Export Configuration (JSON)
+                                          📥 Export Configuration (JSON)
                                       </button>
                                       <label class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors text-sm text-center cursor-pointer">
-                                          <span data-i18n="import_btn">馃摛 Import Configuration (JSON)</span>
+                                          <span data-i18n="import_btn">📤 Import Configuration (JSON)</span>
                                           <input type="file" id="import-file" class="hidden" accept=".json" onchange="importConfig(event)">
                                       </label>
                                   </div>
@@ -1688,7 +1688,7 @@ function getDashboardUI(hasDB) {
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_tg_token">Token Bot</label>
                                   <div class="relative">
                                       <input type="password" id="cfg-tg-token" placeholder="123456:ABC-DEF1234ghIkl-zyx5c" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm pe-12">
-                                      <button type="button" onclick="const n=document.getElementById('cfg-tg-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
+                                      <button type="button" onclick="const n=document.getElementById('cfg-tg-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
                                   </div>
                               </div>
                               <div class="space-y-1 text-start">
@@ -1708,7 +1708,7 @@ function getDashboardUI(hasDB) {
                                   <label class="block text-sm font-bold text-slate-600 dark:text-slate-300 ms-1" data-i18n="lbl_cf_token">CF API Token</label>
                                   <div class="relative">
                                       <input type="password" id="cfg-cf-token" placeholder="Bearer Token (Read Analytics)" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 focus:border-primary outline-none text-sm font-mono pe-12">
-                                      <button type="button" onclick="const n=document.getElementById('cfg-cf-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">馃憗锔�</button>
+                                      <button type="button" onclick="const n=document.getElementById('cfg-cf-token');n.type=n.type==='password'?'text':'password'" class="absolute inset-y-0 end-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">👁️</button>
                                   </div>
                               </div>
                               <p class="text-xs text-slate-400 md:col-span-2" data-i18n="desc_cf_api">Optional: Monitor Worker free usage limits (100k/day). Needs Account Analytics Read permission.</p>
@@ -1808,7 +1808,7 @@ function getDashboardUI(hasDB) {
                               <div class="flex items-center justify-between mb-6">
                                   <h3 class="text-sm uppercase font-bold text-slate-500 tracking-wider">System Activity Logs</h3>
                                   <button onclick="loadLogs()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors">
-                                      馃攧 Refresh
+                                      🔄 Refresh
                                   </button>
                               </div>
                               <div class="space-y-3" id="logs-container">
@@ -1880,7 +1880,7 @@ function getDashboardUI(hasDB) {
       <script>
           const i18n = {
               en: {
-                  title: "Nahan Gateway", pass_ph: "Master Key", login_btn: "Authenticate", err_pass: "Access Denied", missing_db: "鈿狅笍 IOT_DB namespace missing! Settings won't save.",
+                  title: "Nahan Gateway", pass_ph: "Master Key", login_btn: "Authenticate", err_pass: "Access Denied", missing_db: "⚠️ IOT_DB namespace missing! Settings won't save.",
                   logout: "Disconnect", tab_info: "Endpoints", tab_status: "Metrics", tab_settings: "System", tab_adv: "Advanced", tab_logs: "Activity Logs",
                   qr_title: "Direct Stream Link", badge_multi: "Dual-Core Multiplexed", copy: "Copy", copied: "Copied to clipboard!", sync_link: "Cloud Sync URL", active_id: "Hardware ID",
                   stat_ip: "Origin IP", stat_dc: "Edge Node", stat_loc: "Data Region",
@@ -1897,41 +1897,41 @@ function getDashboardUI(hasDB) {
                   save_btn: "Update Config", msg_saving: "Syncing...", msg_saved: "Success! Reloading...", msg_err: "Sync Error",
                   backup_restore_title: "Backup & Restore", ping_test_title: "Latency Diagnostics", ping_test_desc: "Test response time to your active node target.",
                   lbl_github_repo: "GitHub Update Repository", update_avail: "New version available!", update_btn: "Get Latest Code",
-                  metrics_live: "Live Profile Usage", no_metrics: "No active connection data yet.", run_diagnostics: "鈿� Run Diagnostics",
+                  metrics_live: "Live Profile Usage", no_metrics: "No active connection data yet.", run_diagnostics: "⚡ Run Diagnostics",
                   target_node: "Target Node", response: "Response", status: "Status", local_port: "Local Port",
                   lbl_doh: "Custom DNS (DoH Provider)", lbl_strategy: "Configuration Name Strategy", lbl_prefix: "Custom Name Prefix",
                   slave_title: "Slave Worker Nodes", slave_desc: "Enter your other worker Domains (one per line). Master will push settings and users to them automatically, and include them in load-balanced subscriptions!",
                   force_sync: "Force Sync Now", limit_total: "Total Requests Limit (Leave empty for unlimited)", limit_daily: "Daily Requests Limit (Leave empty for unlimited)",
                   limit_days: "Expiration limit (Days) - Leave empty for unlimited", edit_sub: "Edit Subscriber", lbl_name_ph: "Name / Identifier",
                   btn_save_changes: "Save Changes", save_btn_user: "Save User", status_active: "Active", status_paused: "Paused", status_expired: "Expired",
-                  export_btn: "馃摜 Export Configuration (JSON)", import_btn: "馃摛 Import Configuration (JSON)"
+                  export_btn: "📥 Export Configuration (JSON)", import_btn: "📤 Import Configuration (JSON)"
               },
               fa: {
-                  title: "丿乇賵丕夭賴 賳賴丕賳", pass_ph: "讴賱蹖丿 丕氐賱蹖", login_btn: "賵乇賵丿 亘賴 爻蹖爻鬲賲", err_pass: "丿爻鬲乇爻蹖 賲爻丿賵丿 卮丿", missing_db: "鈿狅笍 賮囟丕蹖 IOT_DB 蹖丕賮鬲 賳卮丿! 鬲賳馗蹖賲丕鬲 匕禺蹖乇賴 賳賲蹖鈥屫促堎嗀�.",
-                  logout: "禺乇賵噩", tab_info: "賳賯丕胤 丕鬲氐丕賱", tab_status: "賵囟毓蹖鬲 卮亘讴賴", tab_settings: "鬲賳馗蹖賲丕鬲 倬丕蹖賴", tab_adv: "倬蹖卮乇賮鬲賴", tab_logs: "诏夭丕乇卮 賮毓丕賱蹖鬲",
-                  qr_title: "賱蹖賳讴 丕鬲氐丕賱 賲爻鬲賯蹖賲", badge_multi: "鬲乇讴蹖亘 丿賵诏丕賳賴 V+T", copy: "讴倬蹖", copied: "丿乇 丨丕賮馗賴 讴倬蹖 卮丿!", sync_link: "賱蹖賳讴 爻丕亘 (Cloud Sync)", active_id: "卮賳丕爻賴 爻禺鬲鈥屫з佖藏ж�",
-                  stat_ip: "丌蹖鈥屬聚� 賲亘丿丕", stat_dc: "诏乇賴 賱亘賴", stat_loc: "賲賳胤賯賴 丿丕丿賴",
-                  lbl_proto: "倬乇賵鬲讴賱 賳賲丕蹖卮 賲爻鬲賯蹖賲", lbl_port: "倬賵乇鬲 丿丕丿賴", lbl_id: "卮賳丕爻賴 蹖讴鬲丕 (禺丕賱蹖=禺賵丿讴丕乇)",
-                  lbl_path: "賲爻蹖乇 賲禺賮蹖 API", lbl_pass: "讴賱蹖丿 丕氐賱蹖", lbl_fp: "丕賲囟丕蹖 TLS", lbl_dns: "丌蹖鈥屬聚� 鬲丨賱蹖賱诏乇",
-                  lbl_clean_ips: "丌蹖鈥屬聚屸€屬囏й� 鬲賲蹖夭 (賲賵賱丿 趩賳丿诏丕賳賴)", ph_clean_ips: "1.1.1.1, 2.2.2.2", desc_clean_ips: "丌蹖鈥屬聚� 賴丕 乇丕 亘丕 讴丕賲丕 蹖丕 禺胤 噩丿蹖丿 噩丿丕 讴賳蹖丿. 賱蹖賳讴 爻丕亘 亘乇丕蹖 賴賲賴 鬲乇讴蹖亘 賲蹖鈥屫池ж藏�.",
-                  lbl_fake: "爻丕蹖鬲鈥屬囏й� 丕爻鬲鬲丕乇 (丨丕賱鬲 賲禺賮蹖)", lbl_relay: "丌蹖鈥屬聚� 噩丕蹖诏夭蹖賳 (Proxy IP)", lbl_tfo: "丕鬲氐丕賱 爻乇蹖毓 (TFO)", lbl_ech: "爻賱丕賲 丕賲賳 (ECH)", lbl_tg_token: "鬲賵讴賳 乇亘丕鬲 鬲賱诏乇丕賲", lbl_tg_chat: "丌蹖丿蹖 毓丿丿蹖 鬲賱诏乇丕賲 (Chat ID)", desc_tg_bot: "亘丕 鬲賳馗蹖賲 丕蹖賳 賲賯丕丿蹖乇貙 噩夭卅蹖丕鬲 賵乇賵丿 亘賴 倬賳賱 亘賴 鬲賱诏乇丕賲 丕乇爻丕賱 賲蹖鈥屫促堌�.",
-                  lbl_cf_acc: "丌蹖丿蹖 丕讴丕賳鬲 讴賱賵丿賮賱乇 (Account ID)", lbl_cf_token: "鬲賵讴賳 讴賱賵丿賮賱乇 (API Token)", desc_cf_api: "丕禺鬲蹖丕乇蹖: 亘乇丕蹖 賳賲丕蹖卮 賲蹖夭丕賳 賲氐乇賮 乇賵夭丕賳賴 讴丕乇诏乇 丕夭 100 賴夭丕乇 丿乇禺賵丕爻鬲 乇丕蹖诏丕賳 丿乇 倬蹖丕賲鈥屬囏й� 鬲賱诏乇丕賲.",
-                  lbl_silent: "賴卮丿丕乇 賵 倬蹖睾丕賲 禺丕賲賵卮", lbl_pause: "讴賱蹖丿 鬲賵賯賮 丕囟胤乇丕乇蹖",
-                  tab_users: "讴丕乇亘乇丕賳",
-                  user_mgt_title: "賲丿蹖乇蹖鬲 讴丕乇亘乇丕賳", user_mgt_desc: "賲丿蹖乇蹖鬲 讴丕乇亘乇丕賳 賲鬲毓丿丿貙 鬲賳馗蹖賲 賲丨丿賵丿蹖鬲 鬲乇丕賮蹖讴貙 賵 鬲丕乇蹖禺 丕賳賯囟丕.", btn_add_user: "+ 丕賮夭賵丿賳 讴丕乇亘乇 噩丿蹖丿",
-                  tbl_name: "賳丕賲", tbl_uuid: "卮賳丕爻賴 蹖讴鬲丕", tbl_traffic: "鬲乇丕賮蹖讴 (賲氐乇賮蹖/賲丨丿賵丿蹖鬲)", tbl_exp: "丕賳賯囟丕", tbl_action: "毓賲賱蹖丕鬲", no_users: "讴丕乇亘乇蹖 蹖丕賮鬲 賳卮丿. 丕夭 丿讴賲賴 亘丕賱丕 蹖讴 讴丕乇亘乇 丕蹖噩丕丿 讴賳蹖丿.",
-                  modal_add_title: "丕賮夭賵丿賳 讴丕乇亘乇 噩丿蹖丿", lbl_u_name: "賳丕賲 (丕賱夭丕賲蹖)", lbl_u_gb: "賲丨丿賵丿蹖鬲 鬲乇丕賮蹖讴 (诏蹖诏丕亘丕蹖鬲) - 丕禺鬲蹖丕乇蹖", lbl_u_days: "賲丿鬲 夭賲丕賳 丕毓鬲亘丕乇 (乇賵夭) - 丕禺鬲蹖丕乇蹖", btn_cancel: "丕賳氐乇丕賮", btn_confirm: "丕賮夭賵丿賳 讴丕乇亘乇",
-                  save_btn: "匕禺蹖乇賴 鬲賳馗蹖賲丕鬲", msg_saving: "丿乇 丨丕賱 孬亘鬲...", msg_saved: "賲賵賮賯! 丿乇 丨丕賱 亘丕乇诏匕丕乇蹖...", msg_err: "禺胤丕蹖 丕乇鬲亘丕胤",
-                  backup_restore_title: "倬卮鬲蹖亘丕賳鈥屭屫臂� 賵 亘丕夭蹖丕亘蹖", ping_test_title: "毓蹖亘鈥屰屫жㄛ� 鬲丕禺蹖乇 卮亘讴賴", ping_test_desc: "鬲丕禺蹖乇 倬丕爻禺鈥屫囒� 乇丕 亘賴 丌蹖鈥屬聚� 鬲賲蹖夭 賮毓丕賱 丕賳丿丕夭賴 亘诏蹖乇蹖丿.",
-                  lbl_github_repo: "賲禺夭賳 诏蹖鬲鈥屬囏ж� 噩賴鬲 丌倬丿蹖鬲", update_avail: "亘乇賵夭乇爻丕賳蹖 噩丿蹖丿 丿乇 丿爻鬲乇爻 丕爻鬲!", update_btn: "丿乇蹖丕賮鬲 丌禺乇蹖賳 讴丿",
-                  metrics_live: "賵囟毓蹖鬲 夭賳丿賴 賲氐乇賮 丕鬲氐丕賱丕鬲 賵 倬乇丿丕夭卮", no_metrics: "賴賳賵夭 丿丕丿賴鈥屫й� 丕夭 鬲乇丕讴賳卮 賵 丕鬲氐丕賱丕鬲 賮毓丕賱 孬亘鬲 賳卮丿賴 丕爻鬲.", run_diagnostics: "鈿� 丕噩乇丕蹖 毓蹖亘鈥屰屫жㄛ� 卮亘讴賴",
-                  target_node: "賴丿賮 诏乇賴 卮亘讴賴", response: "賲丿鬲 鬲丕禺蹖乇 (Latency)", status: "賵囟毓蹖鬲 诏乇賴", local_port: "丿乇诏丕賴 賲丨賱蹖",
-                  lbl_doh: "鬲丨賱蹖賱鈥屭� 鬲禺氐氐蹖 DNS (爻乇賵蹖爻 DoH)", lbl_strategy: "乇賵卮 賳丕賲鈥屭柏ж臂� 讴丕賳賮蹖诏鈥屬囏�", lbl_prefix: "倬蹖卮賵賳丿 賳丕賲 讴丕賳賮蹖诏鈥屬囏�",
-                  slave_title: "爻丕蹖乇 賳賵丿賴丕蹖 賲賵丕夭蹖 (Slaves)", slave_desc: "丌丿乇爻 丿丕賲賳賴 爻丕蹖乇 賵乇讴乇賴丕 乇丕 賵丕乇丿 賳賲丕蹖蹖丿 (賴乇 禺胤 蹖讴 丿丕賲賳賴). 賳賵丿 丕氐賱蹖 鬲賳馗蹖賲丕鬲 賵 賲卮鬲乇讴蹖賳 乇丕 亘賴 氐賵乇鬲 禺賵丿讴丕乇 亘丕 丌賳鈥屬囏� 賴賲丕賴賳诏 賲蹖鈥屭┵嗀�!",
-                  force_sync: "賴賲诏丕賲鈥屫池ж槽� 丕噩亘丕乇蹖 賳賵丿賴丕", limit_total: "賲丨丿賵丿蹖鬲 鬲毓丿丕丿 讴賱 丿乇禺賵丕爻鬲鈥屬囏� (亘乇丕蹖 賳丕賲丨丿賵丿 禺丕賱蹖 亘诏匕丕乇蹖丿)", limit_daily: "賲丨丿賵丿蹖鬲 丿乇禺賵丕爻鬲鈥屬囏й� 乇賵夭丕賳賴 (亘乇丕蹖 賳丕賲丨丿賵丿 禺丕賱蹖 亘诏匕丕乇蹖丿)",
-                  limit_days: "賲丿鬲 夭賲丕賳 丕毓鬲亘丕乇 賯丕賳賵賳蹖 (乇賵夭) - 亘乇丕蹖 賳丕賲丨丿賵丿 禺丕賱蹖 亘诏匕丕乇蹖丿", edit_sub: "賵蹖乇丕蹖卮 賲卮禺氐丕鬲 賲卮鬲乇讴", lbl_name_ph: "賳丕賲 蹖丕 卮賳丕爻賴 蹖讴鬲丕",
-                  btn_save_changes: "匕禺蹖乇賴 鬲睾蹖蹖乇丕鬲", save_btn_user: "孬亘鬲 讴丕乇亘乇 噩丿蹖丿", status_active: "賮毓丕賱", status_paused: "賲鬲賵賯賮 卮丿賴", status_expired: "賲賳賯囟蹖 卮丿賴",
-                  export_btn: "馃摜 亘乇賵賳鈥屫ㄘ臂� 賮丕蹖賱 倬蹖讴乇亘賳丿蹖 (JSON)", import_btn: "馃摛 丿乇賵賳鈥屫臂屫槽� 賮丕蹖賱 倬蹖讴乇亘賳丿蹖 (JSON)"
+                  title: "دروازه نهان", pass_ph: "کلید اصلی", login_btn: "ورود به سیستم", err_pass: "دسترسی مسدود شد", missing_db: "⚠️ فضای IOT_DB یافت نشد! تنظیمات ذخیره نمی‌شوند.",
+                  logout: "خروج", tab_info: "نقاط اتصال", tab_status: "وضعیت شبکه", tab_settings: "تنظیمات پایه", tab_adv: "پیشرفته", tab_logs: "گزارش فعالیت",
+                  qr_title: "لینک اتصال مستقیم", badge_multi: "ترکیب دوگانه V+T", copy: "کپی", copied: "در حافظه کپی شد!", sync_link: "لینک ساب (Cloud Sync)", active_id: "شناسه سخت‌افزار",
+                  stat_ip: "آی‌پی مبدا", stat_dc: "گره لبه", stat_loc: "منطقه داده",
+                  lbl_proto: "پروتکل نمایش مستقیم", lbl_port: "پورت داده", lbl_id: "شناسه یکتا (خالی=خودکار)",
+                  lbl_path: "مسیر مخفی API", lbl_pass: "کلید اصلی", lbl_fp: "امضای TLS", lbl_dns: "آی‌پی تحلیلگر",
+                  lbl_clean_ips: "آی‌پی‌های تمیز (مولد چندگانه)", ph_clean_ips: "1.1.1.1, 2.2.2.2", desc_clean_ips: "آی‌پی ها را با کاما یا خط جدید جدا کنید. لینک ساب برای همه ترکیب می‌سازد.",
+                  lbl_fake: "سایت‌های استتار (حالت مخفی)", lbl_relay: "آی‌پی جایگزین (Proxy IP)", lbl_tfo: "اتصال سریع (TFO)", lbl_ech: "سلام امن (ECH)", lbl_tg_token: "توکن ربات تلگرام", lbl_tg_chat: "آیدی عددی تلگرام (Chat ID)", desc_tg_bot: "با تنظیم این مقادیر، جزئیات ورود به پنل به تلگرام ارسال می‌شود.",
+                  lbl_cf_acc: "آیدی اکانت کلودفلر (Account ID)", lbl_cf_token: "توکن کلودفلر (API Token)", desc_cf_api: "اختیاری: برای نمایش میزان مصرف روزانه کارگر از 100 هزار درخواست رایگان در پیام‌های تلگرام.",
+                  lbl_silent: "هشدار و پیغام خاموش", lbl_pause: "کلید توقف اضطراری",
+                  tab_users: "کاربران",
+                  user_mgt_title: "مدیریت کاربران", user_mgt_desc: "مدیریت کاربران متعدد، تنظیم محدودیت ترافیک، و تاریخ انقضا.", btn_add_user: "+ افزودن کاربر جدید",
+                  tbl_name: "نام", tbl_uuid: "شناسه یکتا", tbl_traffic: "ترافیک (مصرفی/محدودیت)", tbl_exp: "انقضا", tbl_action: "عملیات", no_users: "کاربری یافت نشد. از دکمه بالا یک کاربر ایجاد کنید.",
+                  modal_add_title: "افزودن کاربر جدید", lbl_u_name: "نام (الزامی)", lbl_u_gb: "محدودیت ترافیک (گیگابایت) - اختیاری", lbl_u_days: "مدت زمان اعتبار (روز) - اختیاری", btn_cancel: "انصراف", btn_confirm: "افزودن کاربر",
+                  save_btn: "ذخیره تنظیمات", msg_saving: "در حال ثبت...", msg_saved: "موفق! در حال بارگذاری...", msg_err: "خطای ارتباط",
+                  backup_restore_title: "پشتیبان‌گیری و بازیابی", ping_test_title: "عیب‌یابی تاخیر شبکه", ping_test_desc: "تاخیر پاسخ‌دهی را به آی‌پی تمیز فعال اندازه بگیرید.",
+                  lbl_github_repo: "مخزن گیت‌هاب جهت آپدیت", update_avail: "بروزرسانی جدید در دسترس است!", update_btn: "دریافت آخرین کد",
+                  metrics_live: "وضعیت زنده مصرف اتصالات و پردازش", no_metrics: "هنوز داده‌ای از تراکنش و اتصالات فعال ثبت نشده است.", run_diagnostics: "⚡ اجرای عیب‌یابی شبکه",
+                  target_node: "هدف گره شبکه", response: "مدت تاخیر (Latency)", status: "وضعیت گره", local_port: "درگاه محلی",
+                  lbl_doh: "تحلیل‌گر تخصصی DNS (سرویس DoH)", lbl_strategy: "روش نام‌گذاری کانفیگ‌ها", lbl_prefix: "پیشوند نام کانفیگ‌ها",
+                  slave_title: "سایر نودهای موازی (Slaves)", slave_desc: "آدرس دامنه سایر ورکرها را وارد نمایید (هر خط یک دامنه). نود اصلی تنظیمات و مشترکین را به صورت خودکار با آن‌ها هماهنگ می‌کند!",
+                  force_sync: "همگام‌سازی اجباری نودها", limit_total: "محدودیت تعداد کل درخواست‌ها (برای نامحدود خالی بگذارید)", limit_daily: "محدودیت درخواست‌های روزانه (برای نامحدود خالی بگذارید)",
+                  limit_days: "مدت زمان اعتبار قانونی (روز) - برای نامحدود خالی بگذارید", edit_sub: "ویرایش مشخصات مشترک", lbl_name_ph: "نام یا شناسه یکتا",
+                  btn_save_changes: "ذخیره تغییرات", save_btn_user: "ثبت کاربر جدید", status_active: "فعال", status_paused: "متوقف شده", status_expired: "منقضی شده",
+                  export_btn: "📥 برون‌بری فایل پیکربندی (JSON)", import_btn: "📤 درون‌ریزی فایل پیکربندی (JSON)"
               }
           };
   
@@ -1956,7 +1956,7 @@ function getDashboardUI(hasDB) {
   
           function applyLang() {
               document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
-              document.getElementById('lang-toggle').innerText = lang === 'fa' ? 'EN' : '賮丕';
+              document.getElementById('lang-toggle').innerText = lang === 'fa' ? 'EN' : 'فا';
               document.querySelectorAll('[data-i18n]').forEach(el => {
                   const key = el.getAttribute('data-i18n');
                   if(el.placeholder !== undefined && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) el.placeholder = i18n[lang][key];
@@ -2073,7 +2073,7 @@ function getDashboardUI(hasDB) {
   
                   let totalIps = ipsList.length === 0 ? 1 : ipsList.length;
                   let tCfg = totalIps * 2; 
-                  document.getElementById('ip-count-badge').innerText = lang === 'fa' ? (tCfg + ' 讴丕賳賮蹖诏 鬲賵賱蹖丿 卮丿') : (tCfg + ' Configs Active');
+                  document.getElementById('ip-count-badge').innerText = lang === 'fa' ? (tCfg + ' کانفیگ تولید شد') : (tCfg + ' Configs Active');
               } catch(e) { console.error(e); }
           }
   
@@ -2137,9 +2137,9 @@ function getDashboardUI(hasDB) {
                       if (conf.silentAlerts !== undefined) document.getElementById('cfg-silent').checked = conf.silentAlerts;
                       
                       updateUI();
-                      alert(lang === 'fa' ? '倬蹖讴乇亘賳丿蹖 亘丕 賲賵賮賯蹖鬲 賵丕乇丿 卮丿! 乇賵蹖 匕禺蹖乇賴 讴賱蹖讴 讴賳蹖丿.' : 'Configuration parsed! Click save to write changes.');
+                      alert(lang === 'fa' ? 'پیکربندی با موفقیت وارد شد! روی ذخیره کلیک کنید.' : 'Configuration parsed! Click save to write changes.');
                   } catch(err) {
-                      alert(lang === 'fa' ? '賮丕蹖賱 賳丕賲毓鬲亘乇 丕爻鬲!' : 'Invalid configuration file!');
+                      alert(lang === 'fa' ? 'فایل نامعتبر است!' : 'Invalid configuration file!');
                   }
               };
               reader.readAsText(file);
@@ -2401,16 +2401,16 @@ function getDashboardUI(hasDB) {
                       if (Date.now() > u.expiryMs) { expTxt += ' <span class="text-xs text-red-500 font-bold">(Expired)</span>'; isExp = true; }
                   }
                   
-                  let linkHtml = \`<button onclick="copyData('sync-\${u.id}')" class="text-primary hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Copy Subscription Link">馃敆</button>\`;
+                  let linkHtml = \`<button onclick="copyData('sync-\${u.id}')" class="text-primary hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Copy Subscription Link">🔗</button>\`;
                   
-                  let pauseBtnHtml = \`<button onclick="togglePauseUser('\${u.id}')" class="\${u.isPaused ? 'text-green-500 hover:text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-800/50' : 'text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-800/50'} p-2 rounded-lg" title="\${u.isPaused ? 'Resume User' : 'Pause User'}">\${u.isPaused ? '鈻讹笍' : '鈴革笍'}</button>\`;
+                  let pauseBtnHtml = \`<button onclick="togglePauseUser('\${u.id}')" class="\${u.isPaused ? 'text-green-500 hover:text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:hover:bg-green-800/50' : 'text-amber-500 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-800/50'} p-2 rounded-lg" title="\${u.isPaused ? 'Resume User' : 'Pause User'}">\${u.isPaused ? '▶️' : '⏸️'}</button>\`;
 
-                  let editBtnHtml = \`<button onclick="editUser('\${u.id}')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Edit Subscriber">鉁忥笍</button>\`;
+                  let editBtnHtml = \`<button onclick="editUser('\${u.id}')" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/50 p-2 rounded-lg" title="Edit Subscriber">✏️</button>\`;
 
                   let tr = document.createElement('tr');
                   tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors";
                   tr.innerHTML = \`
-                      <td class="px-4 py-4 font-bold text-slate-700 dark:text-slate-300">\${u.name} \${u.isPaused ? '鈴革笍' : (isExp ? '馃敶' : '馃煝')}</td>
+                      <td class="px-4 py-4 font-bold text-slate-700 dark:text-slate-300">\${u.name} \${u.isPaused ? '⏸️' : (isExp ? '🔴' : '🟢')}</td>
                       <td class="px-4 py-4 font-mono text-xs text-slate-500 select-all">\${u.id}</td>
                       <td class="px-4 py-4 text-slate-600 dark:text-slate-400 font-mono"><div class="flex flex-col"><span class="font-bold">Total: \${userReqs} / \${limitTotalTxt} (\${perT})</span><span class="text-xs opacity-70">Daily: \${userDReqs} / \${limitDailyTxt} (\${perD})</span></div></td>
                       <td class="px-4 py-4 text-slate-600 dark:text-slate-400">\${expTxt}</td>
@@ -2419,7 +2419,7 @@ function getDashboardUI(hasDB) {
                           \${linkHtml}
                           \${pauseBtnHtml}
                           \${editBtnHtml}
-                          <button onclick="deleteUser('\${u.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-800/50 p-2 rounded-lg">馃棏锔�</button>
+                          <button onclick="deleteUser('\${u.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-800/50 p-2 rounded-lg">🗑️</button>
                       </td>
                   \`;
                   tbl.appendChild(tr);
@@ -2596,7 +2596,7 @@ function getDashboardUI(hasDB) {
               if (!banner) return;
               
               const msg = lang === 'fa' 
-                  ? '賳爻禺賴 噩丿蹖丿鬲乇 (v' + version + ') 丿乇 賲禺夭賳 诏蹖鬲\u200c賴丕亘 卮賲丕 (' + repo + ') 丿乇 丿爻鬲乇爻 丕爻鬲.' 
+                  ? 'نسخه جدیدتر (v' + version + ') در مخزن گیت\u200cهاب شما (' + repo + ') در دسترس است.' 
                   : 'A newer version (v' + version + ') is available in your GitHub repository (' + repo + ').';
                   
               document.getElementById('update-alert-text').textContent = msg;
